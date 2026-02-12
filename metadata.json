@@ -1,0 +1,5 @@
+{
+  "name": "TAGO",
+  "description": "A professional management system for group flight reservations with automated deadline tracking and reminders.",
+  "requestFramePermissions": []
+}
