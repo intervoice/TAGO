@@ -7,6 +7,7 @@ import { GroupTable } from './components/GroupTable';
 import { Dashboard } from './components/Dashboard';
 import { UserGuide } from './components/UserGuide';
 import { Plus, Search, LogOut, Plane, X, Save, Mail, Trash2, Bell, ChevronRight, LayoutDashboard, Table as TableIcon, Settings, User as UserIcon, ShieldCheck, Key, Building2, Clock, CheckCircle as CheckCircleIcon, Coins, Globe, Lock, Filter, Download, FileText, CheckSquare, Square, BookOpen, Users, History, ChevronDown, ChevronUp, SearchCode, Calendar } from 'lucide-react';
+import { storage } from './api';
 
 const App: React.FC = () => {
   // --- Auth State ---
@@ -49,58 +50,101 @@ const App: React.FC = () => {
   const [selectedAirline, setSelectedAirline] = useState<AirlineCode | 'ALL'>('ALL');
 
   // --- Initial Data Load ---
+  // --- Initial Data Load ---
   useEffect(() => {
-    const savedGroups = localStorage.getItem('flight_groups_v3');
-    if (savedGroups) try { setGroups(JSON.parse(savedGroups)); } catch (e) { }
-
-    const savedLogs = localStorage.getItem('system_audit_logs_v1');
-    if (savedLogs) try { setLogs(JSON.parse(savedLogs)); } catch (e) { }
-
-    const savedAirlines = localStorage.getItem('airline_list_v1');
-    const initialAirlines = savedAirlines ? JSON.parse(savedAirlines) : DEFAULT_AIRLINES;
-    setAirlines(initialAirlines);
-    setExportSelectedAirlines(initialAirlines);
-
-    const savedEmailSettings = localStorage.getItem('email_integration_v1');
-    if (savedEmailSettings) try { setEmailSettings(JSON.parse(savedEmailSettings)); } catch (e) { }
-
-    const savedConfigs = localStorage.getItem('airline_configs_v1');
-    if (savedConfigs) {
-      try { setAirlineConfigs(JSON.parse(savedConfigs)); } catch (e) { }
-    } else {
-      const defaults: Record<string, AirlineConfig> = {};
-      initialAirlines.forEach((al: string) => {
-        defaults[al] = {
-          airlineCode: al as AirlineCode,
-          recipientEmail: '',
-          currency: al === 'A2' ? 'EUR' : 'USD',
-          reminders: [
-            { id: '1', label: 'Deposit Deadline', daysBefore: 66, active: false },
-            { id: '2', label: 'Full Payment', daysBefore: 36, active: false },
-            { id: '3', label: 'Names Request', daysBefore: 18, active: false }
-          ]
-        };
-      });
-      setAirlineConfigs(defaults);
-    }
-
-    const savedUsers = localStorage.getItem('system_users');
-    if (savedUsers) {
-      try { setUsers(JSON.parse(savedUsers)); } catch (e) { setUsers([]); }
-    } else {
-      const admin: User = {
-        id: 'admin-1', username: 'admin', password: 'TalTeufa', role: UserRole.ADMIN, fullName: 'System Administrator',
-        allowedAirlines: initialAirlines
+    const loadData = async () => {
+      // Helper to migrate or load
+      const initKey = async (key: string, setter: (val: any) => void, defaultVal?: any) => {
+        try {
+          let data = await storage.get(key);
+          if (!data) {
+            // Try migration from local storage
+            const local = localStorage.getItem(key);
+            if (local) {
+              data = JSON.parse(local);
+              await storage.set(key, data);
+            } else if (defaultVal !== undefined) {
+              data = defaultVal;
+              await storage.set(key, data);
+            }
+          }
+          if (data) setter(data);
+        } catch (e) {
+          console.error(`Failed to load ${key}`, e);
+          if (defaultVal) setter(defaultVal);
+        }
       };
-      setUsers([admin]);
-    }
 
-    const savedSession = localStorage.getItem('current_user_session');
-    if (savedSession) {
-      try { setCurrentUser(JSON.parse(savedSession)); } catch (e) { setCurrentUser(null); }
-    }
+      await initKey('flight_groups_v3', setGroups, []);
+      await initKey('system_audit_logs_v1', setLogs, []);
 
-    setIsLoaded(true);
+      // Airlines specific logic for defaults
+      let airlinesData = await storage.get('airline_list_v1');
+      if (!airlinesData) {
+        const local = localStorage.getItem('airline_list_v1');
+        if (local) {
+          airlinesData = JSON.parse(local);
+        } else {
+          airlinesData = DEFAULT_AIRLINES;
+        }
+        await storage.set('airline_list_v1', airlinesData);
+      }
+      setAirlines(airlinesData);
+      setExportSelectedAirlines(airlinesData);
+
+      await initKey('email_integration_v1', setEmailSettings);
+
+      // Configs
+      let configsData = await storage.get('airline_configs_v1');
+      if (!configsData) {
+        const local = localStorage.getItem('airline_configs_v1');
+        if (local) {
+          configsData = JSON.parse(local);
+        } else {
+          configsData = {};
+          airlinesData.forEach((al: string) => {
+            configsData[al] = {
+              airlineCode: al as AirlineCode,
+              recipientEmail: '',
+              currency: al === 'A2' ? 'EUR' : 'USD',
+              reminders: [
+                { id: '1', label: 'Deposit Deadline', daysBefore: 66, active: false },
+                { id: '2', label: 'Full Payment', daysBefore: 36, active: false },
+                { id: '3', label: 'Names Request', daysBefore: 18, active: false }
+              ]
+            };
+          });
+        }
+        await storage.set('airline_configs_v1', configsData);
+      }
+      setAirlineConfigs(configsData);
+
+      // Users
+      let usersData = await storage.get('system_users');
+      if (!usersData) {
+        const local = localStorage.getItem('system_users');
+        if (local) {
+          usersData = JSON.parse(local);
+        } else {
+          usersData = [{
+            id: 'admin-1', username: 'admin', password: 'TalTeufa', role: UserRole.ADMIN, fullName: 'System Administrator',
+            allowedAirlines: airlinesData
+          }];
+        }
+        await storage.set('system_users', usersData);
+      }
+      setUsers(usersData);
+
+      // Session is local only
+      const savedSession = localStorage.getItem('current_user_session');
+      if (savedSession) {
+        try { setCurrentUser(JSON.parse(savedSession)); } catch (e) { setCurrentUser(null); }
+      }
+
+      setIsLoaded(true);
+    };
+
+    loadData();
   }, []);
 
   // --- Email Logic ---
@@ -155,12 +199,13 @@ const App: React.FC = () => {
 
 
   // --- Persistence ---
-  useEffect(() => { if (isLoaded) localStorage.setItem('flight_groups_v3', JSON.stringify(groups)); }, [groups, isLoaded]);
-  useEffect(() => { if (isLoaded) localStorage.setItem('airline_configs_v1', JSON.stringify(airlineConfigs)); }, [airlineConfigs, isLoaded]);
-  useEffect(() => { if (isLoaded) localStorage.setItem('system_users', JSON.stringify(users)); }, [users, isLoaded]);
-  useEffect(() => { if (isLoaded) localStorage.setItem('airline_list_v1', JSON.stringify(airlines)); }, [airlines, isLoaded]);
-  useEffect(() => { if (isLoaded) localStorage.setItem('email_integration_v1', JSON.stringify(emailSettings)); }, [emailSettings, isLoaded]);
-  useEffect(() => { if (isLoaded) localStorage.setItem('system_audit_logs_v1', JSON.stringify(logs)); }, [logs, isLoaded]);
+  // --- Persistence ---
+  useEffect(() => { if (isLoaded) storage.set('flight_groups_v3', groups); }, [groups, isLoaded]);
+  useEffect(() => { if (isLoaded) storage.set('airline_configs_v1', airlineConfigs); }, [airlineConfigs, isLoaded]);
+  useEffect(() => { if (isLoaded) storage.set('system_users', users); }, [users, isLoaded]);
+  useEffect(() => { if (isLoaded) storage.set('airline_list_v1', airlines); }, [airlines, isLoaded]);
+  useEffect(() => { if (isLoaded) storage.set('email_integration_v1', emailSettings); }, [emailSettings, isLoaded]);
+  useEffect(() => { if (isLoaded) storage.set('system_audit_logs_v1', logs); }, [logs, isLoaded]);
 
   // --- Logging Helper ---
   const addLog = (action: LogAction, entityId: string, entityPNR: string, details: string, changes?: UserLog['changes']) => {
