@@ -14,7 +14,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - tago_storage_v1:/app/data
+      - tago_storage_v1:/usr/src/app/data
     restart: always
 
 volumes:
