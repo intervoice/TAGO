@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { FlightGroup, PNRStatus } from '../types';
-import { Users, DollarSign, Plane, TrendingUp, CheckCircle, Clock } from 'lucide-react';
+import { Users, DollarSign, Plane, TrendingUp, CheckCircle, Clock, Filter, BarChart3, Building2 } from 'lucide-react';
 
 interface DashboardProps {
   groups: FlightGroup[];
@@ -9,25 +9,119 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ groups, airlines }) => {
-  const stats = {
-    totalGroups: groups.length,
-    totalPassengers: groups.reduce((acc, g) => acc + (Number(g.size) || 0), 0),
-    totalRevenue: groups.reduce((acc, g) => acc + ((Number(g.fare) + Number(g.taxes)) * (Number(g.size) || 0)), 0),
-    activeGroups: groups.filter(g => g.status.startsWith('OK')).length,
-    pendingGroups: groups.filter(g => g.status.startsWith('PD')).length,
-    cancelledGroups: groups.filter(g => g.status.startsWith('XX')).length,
+  // --- State for Metric Filtering ---
+  const [selectedMetrics, setSelectedMetrics] = useState<{ fare: boolean; taxes: boolean; markup: boolean }>({
+    fare: true,
+    taxes: false,
+    markup: true // Default as per request
+  });
+
+  const toggleMetric = (key: keyof typeof selectedMetrics) => {
+    setSelectedMetrics(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const calculateTotal = (group: FlightGroup) => {
+    let total = 0;
+    if (selectedMetrics.fare) total += Number(group.fare) || 0;
+    if (selectedMetrics.taxes) total += Number(group.taxes) || 0;
+    if (selectedMetrics.markup) total += Number(group.markup) || 0;
+    return total * (Number(group.size) || 0);
+  };
+
+  const stats = useMemo(() => {
+    return {
+      totalGroups: groups.length,
+      totalPassengers: groups.reduce((acc, g) => acc + (Number(g.size) || 0), 0),
+      totalRevenue: groups.reduce((acc, g) => acc + calculateTotal(g), 0),
+      activeGroups: groups.filter(g => g.status.startsWith('OK')).length,
+      pendingGroups: groups.filter(g => g.status.startsWith('PD')).length,
+      cancelledGroups: groups.filter(g => g.status.startsWith('XX')).length,
+    };
+  }, [groups, selectedMetrics]);
+
   // Use airlines from props instead of non-existent AIRLINES constant
-  const airlineCounts = airlines.map(al => ({
-    name: al,
-    count: groups.filter(g => g.airline === al).length,
-    passengers: groups.filter(g => g.airline === al).reduce((acc, g) => acc + (Number(g.size) || 0), 0)
-  })).sort((a, b) => b.count - a.count);
+  const airlineCounts = useMemo(() => {
+    return airlines.map(al => ({
+      name: al,
+      count: groups.filter(g => g.airline === al).length,
+      passengers: groups.filter(g => g.airline === al).reduce((acc, g) => acc + (Number(g.size) || 0), 0)
+    })).sort((a, b) => b.count - a.count);
+  }, [groups, airlines]);
+
+  const topAgencies = useMemo(() => {
+    const agencyMap = new Map<string, { count: number; passengers: number; revenue: number }>();
+
+    groups.forEach(g => {
+      if (!g.agencyName) return;
+      const current = agencyMap.get(g.agencyName) || { count: 0, passengers: 0, revenue: 0 };
+      agencyMap.set(g.agencyName, {
+        count: current.count + 1,
+        passengers: current.passengers + (Number(g.size) || 0),
+        revenue: current.revenue + calculateTotal(g)
+      });
+    });
+
+    return Array.from(agencyMap.entries())
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+  }, [groups, selectedMetrics]);
+
+  const monthlyStats = useMemo(() => {
+    const last12Months = Array.from({ length: 12 }, (_, i) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      return {
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        label: d.toLocaleString('default', { month: 'short' }),
+        year: d.getFullYear(),
+        month: d.getMonth()
+      };
+    }).reverse();
+
+    return last12Months.map(m => {
+      const monthGroups = groups.filter(g => {
+        const d = new Date(g.depDate);
+        return d.getFullYear() === m.year && d.getMonth() === m.month;
+      });
+
+      return {
+        label: m.label,
+        revenue: monthGroups.reduce((acc, g) => acc + calculateTotal(g), 0),
+        passengers: monthGroups.reduce((acc, g) => acc + (Number(g.size) || 0), 0)
+      };
+    });
+  }, [groups, selectedMetrics]);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Summary Cards */}
+    <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+      {/* Header & Filters */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+        <div>
+          <h2 className="text-2xl font-black text-gray-900">Statistics Dashboard</h2>
+          <p className="text-gray-500 text-sm font-medium">Overview of performance and metrics</p>
+        </div>
+
+        <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-2xl border border-gray-200">
+          <div className="px-3 py-1.5 flex items-center gap-2 text-xs font-black text-gray-500 uppercase tracking-wider border-r border-gray-200">
+            <Filter className="w-3.5 h-3.5" />
+            Calc. Metric
+          </div>
+          {(['markup', 'fare', 'taxes'] as const).map(key => (
+            <button
+              key={key}
+              onClick={() => toggleMetric(key)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${selectedMetrics[key]
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
+                  : 'text-gray-400 hover:bg-gray-100'
+                }`}
+            >
+              {key}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-5">
           <div className="bg-blue-100 p-4 rounded-2xl">
@@ -54,7 +148,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ groups, airlines }) => {
             <DollarSign className="w-6 h-6 text-amber-600" />
           </div>
           <div>
-            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Est. Revenue</p>
+            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Total Value</p>
             <h4 className="text-2xl font-black text-gray-900">${stats.totalRevenue.toLocaleString()}</h4>
           </div>
         </div>
@@ -86,8 +180,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ groups, airlines }) => {
                 <span>{stats.activeGroups}</span>
               </div>
               <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
-                <div 
-                  className="bg-emerald-500 h-full rounded-full transition-all duration-1000" 
+                <div
+                  className="bg-emerald-500 h-full rounded-full transition-all duration-1000"
                   style={{ width: `${stats.totalGroups > 0 ? (stats.activeGroups / stats.totalGroups) * 100 : 0}%` }}
                 ></div>
               </div>
@@ -99,8 +193,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ groups, airlines }) => {
                 <span>{stats.pendingGroups}</span>
               </div>
               <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
-                <div 
-                  className="bg-amber-500 h-full rounded-full transition-all duration-1000" 
+                <div
+                  className="bg-amber-500 h-full rounded-full transition-all duration-1000"
                   style={{ width: `${stats.totalGroups > 0 ? (stats.pendingGroups / stats.totalGroups) * 100 : 0}%` }}
                 ></div>
               </div>
@@ -112,8 +206,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ groups, airlines }) => {
                 <span>{stats.cancelledGroups}</span>
               </div>
               <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
-                <div 
-                  className="bg-rose-500 h-full rounded-full transition-all duration-1000" 
+                <div
+                  className="bg-rose-500 h-full rounded-full transition-all duration-1000"
                   style={{ width: `${stats.totalGroups > 0 ? (stats.cancelledGroups / stats.totalGroups) * 100 : 0}%` }}
                 ></div>
               </div>
@@ -140,6 +234,64 @@ export const Dashboard: React.FC<DashboardProps> = ({ groups, airlines }) => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Monthly Performance Chart */}
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+          <h5 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-indigo-500" />
+            Monthly Performance (Revenue)
+          </h5>
+          <div className="h-64 flex items-end justify-between gap-2">
+            {monthlyStats.map((m, i) => {
+              // Calculate max for scaling (rough)
+              const maxVal = Math.max(...monthlyStats.map(x => x.revenue));
+              const heightPct = maxVal > 0 ? (m.revenue / maxVal) * 100 : 0;
+              return (
+                <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
+                  <div className="w-full bg-gray-100 rounded-t-xl relative overflow-hidden group-hover:bg-gray-200 transition-colors h-full flex items-end">
+                    <div
+                      className="w-full bg-indigo-500 rounded-t-xl transition-all duration-1000 opacity-80 group-hover:opacity-100"
+                      style={{ height: `${heightPct}%` }}
+                    ></div>
+                  </div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">{m.label}</span>
+                  {/* Tooltip-ish value on hover could go here, for now just static bars */}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Top Agencies */}
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+          <h5 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-amber-500" />
+            Top Agencies (by Value)
+          </h5>
+          <div className="space-y-4">
+            {topAgencies.map((agency, i) => (
+              <div key={agency.name} className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 border border-transparent hover:border-gray-200 hover:bg-white transition-all shadow-sm hover:shadow-md">
+                <div className="flex items-center gap-4">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-white ${i === 0 ? 'bg-amber-400' : i === 1 ? 'bg-gray-400' : i === 2 ? 'bg-orange-700' : 'bg-blue-200'
+                    }`}>
+                    {i + 1}
+                  </div>
+                  <div>
+                    <h6 className="text-sm font-bold text-gray-900">{agency.name}</h6>
+                    <span className="text-xs font-medium text-gray-500">{agency.passengers} Passengers</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="block text-sm font-black text-gray-900">${agency.revenue.toLocaleString()}</span>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{agency.count} Groups</span>
+                </div>
+              </div>
+            ))}
+            {topAgencies.length === 0 && <p className="text-center text-gray-400 py-4">No data available.</p>}
           </div>
         </div>
       </div>
@@ -178,7 +330,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ groups, airlines }) => {
                 </div>
               </div>
             ))}
-            {groups.length === 0 && <p className="text-sm text-gray-400 py-10 text-center col-span-full">No upcoming departures found.</p>}
+          {groups.length === 0 && <p className="text-sm text-gray-400 py-10 text-center col-span-full">No upcoming departures found.</p>}
         </div>
       </div>
     </div>
