@@ -12,7 +12,7 @@ services:
     build: ./server
     container_name: tago_backend
     ports:
-      - "3000:3000"
+      - "3001:3001"
     volumes:
       - tago_storage_v1:/usr/src/app/data
     restart: always
