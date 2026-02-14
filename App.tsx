@@ -54,95 +54,100 @@ const App: React.FC = () => {
   // --- Initial Data Load ---
   useEffect(() => {
     const loadData = async () => {
-      // Helper to migrate or load
-      const initKey = async (key: string, setter: (val: any) => void, defaultVal?: any) => {
-        try {
+      try {
+        // Helper to migrate or load. Note: storage.get now throws on network/server errors.
+        const initKey = async (key: string, setter: (val: any) => void, defaultVal?: any) => {
           let data = await storage.get(key);
-          if (!data) {
-            // Try migration from local storage
+          if (data === null) {
+            // Data is missing on server (404), so we can populate from local or default
             const local = localStorage.getItem(key);
             if (local) {
               data = JSON.parse(local);
-              await storage.set(key, data);
+              if (Array.isArray(data) && data.length > 0) {
+                await storage.set(key, data);
+              }
             } else if (defaultVal !== undefined) {
               data = defaultVal;
               await storage.set(key, data);
             }
           }
           if (data) setter(data);
-        } catch (e) {
-          console.error(`Failed to load ${key}`, e);
-          if (defaultVal) setter(defaultVal);
+        };
+
+        await initKey('flight_groups_v3', setGroups, []);
+        await initKey('system_audit_logs_v1', setLogs, []);
+
+        // Airlines specific logic
+        let airlinesData = await storage.get('airline_list_v1');
+        if (airlinesData === null) {
+          const local = localStorage.getItem('airline_list_v1');
+          if (local) {
+            airlinesData = JSON.parse(local);
+          } else {
+            airlinesData = DEFAULT_AIRLINES;
+          }
+          await storage.set('airline_list_v1', airlinesData);
         }
-      };
+        setAirlines(airlinesData);
+        setExportSelectedAirlines(airlinesData);
 
-      await initKey('flight_groups_v3', setGroups, []);
-      await initKey('system_audit_logs_v1', setLogs, []);
+        await initKey('email_integration_v1', setEmailSettings);
 
-      // Airlines specific logic for defaults
-      let airlinesData = await storage.get('airline_list_v1');
-      if (!airlinesData) {
-        const local = localStorage.getItem('airline_list_v1');
-        if (local) {
-          airlinesData = JSON.parse(local);
+        // Configs
+        let configsData = await storage.get('airline_configs_v1');
+        if (configsData === null) {
+          const local = localStorage.getItem('airline_configs_v1');
+          if (local) {
+            configsData = JSON.parse(local);
+          } else {
+            configsData = {};
+            airlinesData.forEach((al: string) => {
+              configsData[al] = {
+                airlineCode: al as AirlineCode,
+                recipientEmail: '',
+                currency: al === 'A2' ? 'EUR' : 'USD',
+                reminders: [
+                  { id: '1', label: 'Deposit Deadline', daysBefore: 66, time: '09:00', active: false },
+                  { id: '2', label: 'Full Payment', daysBefore: 36, time: '09:00', active: false },
+                  { id: '3', label: 'Names Request', daysBefore: 18, time: '09:00', active: false }
+                ]
+              };
+            });
+          }
+          await storage.set('airline_configs_v1', configsData);
+          setAirlineConfigs(configsData);
         } else {
-          airlinesData = DEFAULT_AIRLINES;
+          setAirlineConfigs(configsData);
         }
-        await storage.set('airline_list_v1', airlinesData);
-      }
-      setAirlines(airlinesData);
-      setExportSelectedAirlines(airlinesData);
 
-      await initKey('email_integration_v1', setEmailSettings);
-
-      // Configs
-      let configsData = await storage.get('airline_configs_v1');
-      if (!configsData) {
-        const local = localStorage.getItem('airline_configs_v1');
-        if (local) {
-          configsData = JSON.parse(local);
-        } else {
-          configsData = {};
-          airlinesData.forEach((al: string) => {
-            configsData[al] = {
-              airlineCode: al as AirlineCode,
-              recipientEmail: '',
-              currency: al === 'A2' ? 'EUR' : 'USD',
-              reminders: [
-                { id: '1', label: 'Deposit Deadline', daysBefore: 66, time: '09:00', active: false },
-                { id: '2', label: 'Full Payment', daysBefore: 36, time: '09:00', active: false },
-                { id: '3', label: 'Names Request', daysBefore: 18, time: '09:00', active: false }
-              ]
-            };
-          });
+        // Users
+        let usersData = await storage.get('system_users');
+        if (usersData === null) {
+          const local = localStorage.getItem('system_users');
+          if (local) {
+            usersData = JSON.parse(local);
+          } else {
+            usersData = [{
+              id: 'admin-1', username: 'admin', password: 'TalTeufa', role: UserRole.ADMIN, fullName: 'System Administrator',
+              allowedAirlines: airlinesData
+            }];
+          }
+          await storage.set('system_users', usersData);
         }
-        await storage.set('airline_configs_v1', configsData);
-      }
-      setAirlineConfigs(configsData);
+        setUsers(usersData);
 
-      // Users
-      let usersData = await storage.get('system_users');
-      if (!usersData) {
-        const local = localStorage.getItem('system_users');
-        if (local) {
-          usersData = JSON.parse(local);
-        } else {
-          usersData = [{
-            id: 'admin-1', username: 'admin', password: 'TalTeufa', role: UserRole.ADMIN, fullName: 'System Administrator',
-            allowedAirlines: airlinesData
-          }];
+        // Session is local only
+        const savedSession = localStorage.getItem('current_user_session');
+        if (savedSession) {
+          try { setCurrentUser(JSON.parse(savedSession)); } catch (e) { setCurrentUser(null); }
         }
-        await storage.set('system_users', usersData);
-      }
-      setUsers(usersData);
 
-      // Session is local only
-      const savedSession = localStorage.getItem('current_user_session');
-      if (savedSession) {
-        try { setCurrentUser(JSON.parse(savedSession)); } catch (e) { setCurrentUser(null); }
+        setIsLoaded(true);
+      } catch (err) {
+        console.error("CRITICAL ERROR: Failed to load data from server. Saving disabled.", err);
+        alert("CRITICAL ERROR: Failed to load data from server. Check your connection and refresh. Data saving is disabled to prevent data loss.");
+        // We DO NOT set isLoaded(true) here, effectively disabling all save hooks.
       }
-
-      setIsLoaded(true);
     };
 
     loadData();

@@ -1,14 +1,15 @@
 export const storage = {
     get: async (key: string) => {
         try {
-            // Disable cache to ensure fresh data is fetched from the server and avoid overwriting with stale Empty data on valid save
+            // Disable cache to ensure fresh data is fetched from the server
             const res = await fetch(`/api/storage/${key}?t=${Date.now()}`, { cache: 'no-store' });
-            if (res.status === 404) return null;
+            if (res.status === 404) return null; // Logic: Key doesn't exist yet
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`); // Logic: Server error
             const data = await res.json();
             return data;
         } catch (err) {
             console.error(`Error fetching ${key}:`, err);
-            return null;
+            throw err; // Propagate error so App.tsx knows it failed
         }
     },
     set: async (key: string, value: any) => {
