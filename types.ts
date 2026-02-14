@@ -47,6 +47,7 @@ export interface CustomReminder {
   id: string;
   label: string;
   daysBefore: number;
+  time?: string; // 'HH:MM' format, e.g. "10:00"
   active: boolean;
 }
 

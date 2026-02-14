@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { FlightGroup, PNRStatus, Reminder, AirlineCode, User, UserRole, AirlineConfig, Currency, EmailSettings, UserLog, LogAction } from './types';
 import { STATUS_LIST, subtractDays, addDays, getEmailTemplate, DEFAULT_AIRLINES, CURRENCY_SYMBOLS, formatDate } from './constants';
 import { ReminderWidget } from './components/ReminderWidget';
@@ -7,7 +8,7 @@ import { GroupTable } from './components/GroupTable';
 import { Dashboard } from './components/Dashboard';
 import { UserGuide } from './components/UserGuide';
 import { Plus, Search, LogOut, Plane, X, Save, Mail, Trash2, Bell, ChevronRight, LayoutDashboard, Table as TableIcon, Settings, User as UserIcon, ShieldCheck, Key, Building2, Clock, CheckCircle as CheckCircleIcon, Coins, Globe, Lock, Filter, Download, FileText, CheckSquare, Square, BookOpen, Users, History, ChevronDown, ChevronUp, SearchCode, Calendar } from 'lucide-react';
-import { storage } from './api';
+import { storage } from './storage';
 
 const App: React.FC = () => {
   // --- Auth State ---
@@ -108,9 +109,9 @@ const App: React.FC = () => {
               recipientEmail: '',
               currency: al === 'A2' ? 'EUR' : 'USD',
               reminders: [
-                { id: '1', label: 'Deposit Deadline', daysBefore: 66, active: false },
-                { id: '2', label: 'Full Payment', daysBefore: 36, active: false },
-                { id: '3', label: 'Names Request', daysBefore: 18, active: false }
+                { id: '1', label: 'Deposit Deadline', daysBefore: 66, time: '09:00', active: false },
+                { id: '2', label: 'Full Payment', daysBefore: 36, time: '09:00', active: false },
+                { id: '3', label: 'Names Request', daysBefore: 18, time: '09:00', active: false }
               ]
             };
           });
@@ -322,52 +323,83 @@ const App: React.FC = () => {
     if (!isLoaded) return;
 
     const checkAndSendEmails = async () => {
+      // Get current time in Israel
       const now = new Date();
-      const currentHour = now.getHours();
+      const israelTimeStr = now.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem', hour12: false });
+      const israelDate = new Date(israelTimeStr);
+      const currentHour = israelDate.getHours();
+      const todayStr = israelDate.toLocaleDateString('en-CA'); // YYYY-MM-DD
 
-      // Check if it's 10 AM or later
-      if (currentHour >= 10) {
-        const lastSentDate = localStorage.getItem('last_daily_email_date');
-        const todayStr = now.toISOString().split('T')[0];
+      // Get sent log for today
+      const sentKey = `sent_reminders_${todayStr}`;
+      const sentReminders: string[] = JSON.parse(localStorage.getItem(sentKey) || '[]');
+      let updatedSentReminders = [...sentReminders];
+      let hasUpdates = false;
 
-        if (lastSentDate !== todayStr) {
-          console.log('Checking for automated emails...');
+      console.log(`Checking emails at Israel Time: ${israelDate.toLocaleTimeString()} (Hour: ${currentHour})`);
 
-          let sentCount = 0;
-          for (const reminder of reminders) {
-            const group = groups.find(g => g.pnr === reminder.pnr);
-            const config = airlineConfigs[group?.airline || ''];
-            const recipient = config?.recipientEmail;
+      let sentCount = 0;
+      for (const reminder of reminders) {
+        const group = groups.find(g => g.pnr === reminder.pnr);
+        const config = airlineConfigs[group?.airline || ''];
 
-            // Check if we already sent this specific reminder today to avoid spam if we reload?
-            // For now, relying on the single daily run flag.
+        // Find the specific config reminder definition to get the time
+        const configReminder = config?.reminders.find(r => r.label && reminder.description.includes(r.label));
 
-            if (recipient) {
-              // Send quietly without alerts for each one
-              try {
-                await fetch('/api/send-email', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    settings: emailSettings,
-                    to: recipient,
-                    subject: `Reminder: ${reminder.description} - PNR ${reminder.pnr}`,
-                    text: reminder.emailTemplate
-                  })
-                });
-                sentCount++;
-              } catch (e) {
-                console.error("Failed to auto-send email", e);
-              }
+        // Parse scheduled hour (default to 09:00 if missing)
+        const timeParts = (configReminder?.time || '09:00').split(':');
+        const scheduledHour = parseInt(timeParts[0]);
+
+        // Unique ID for this specific reminder event instance
+        const reminderEventId = `${reminder.pnr}_${reminder.description}_${todayStr}`;
+
+        // Check if:
+        // 1. Current Israel Hour is >= Scheduled Hour
+        // 2. We haven't sent this specific reminder today
+        if (currentHour >= scheduledHour && !updatedSentReminders.includes(reminderEventId)) {
+          const recipient = config?.recipientEmail;
+          if (recipient) {
+            try {
+              await fetch('/api/send-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  settings: emailSettings,
+                  to: recipient,
+                  subject: `Reminder: ${reminder.description} - PNR ${reminder.pnr}`,
+                  text: reminder.emailTemplate
+                })
+              });
+              sentCount++;
+              updatedSentReminders.push(reminderEventId);
+              hasUpdates = true;
+            } catch (e) {
+              console.error("Failed to auto-send email", e);
             }
           }
-
-          if (sentCount > 0) {
-            console.log(`Automated Process: ${sentCount} reminder emails have been sent.`);
-          }
-
-          localStorage.setItem('last_daily_email_date', todayStr);
         }
+      }
+
+      if (sentCount > 0) {
+        console.log(`Automated Process: ${sentCount} reminder emails have been sent.`);
+      }
+
+      if (hasUpdates) {
+        localStorage.setItem(sentKey, JSON.stringify(updatedSentReminders));
+
+        // Cleanup old logs (keep last 3 days)
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('sent_reminders_')) {
+              const datePart = key.replace('sent_reminders_', '');
+              const dateVal = new Date(datePart);
+              const diffTime = Math.abs(israelDate.getTime() - dateVal.getTime());
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              if (diffDays > 3) localStorage.removeItem(key);
+            }
+          }
+        } catch (e) { }
       }
     };
 
@@ -435,15 +467,114 @@ const App: React.FC = () => {
           recipientEmail: '',
           currency: 'USD',
           reminders: [
-            { id: '1', label: 'Deposit Deadline', daysBefore: 66, active: false },
-            { id: '2', label: 'Full Payment', daysBefore: 36, active: false },
-            { id: '3', label: 'Names Request', daysBefore: 18, active: false }
+            { id: '1', label: 'Deposit Deadline', daysBefore: 66, time: '09:00', active: false },
+            { id: '2', label: 'Full Payment', daysBefore: 36, time: '09:00', active: false },
+            { id: '3', label: 'Names Request', daysBefore: 18, time: '09:00', active: false }
           ]
         }
       }));
       setNewAirlineCode('');
       setSelectedConfigAirline(code);
     }
+  };
+
+  // --- Import Logic ---
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+      const newGroups: FlightGroup[] = [];
+      const timestamp = new Date().toISOString();
+      let importedCount = 0;
+
+      // Helper to parse DD/MM/YYYY to YYYY-MM-DD
+      const parseDate = (dateStr: any) => {
+        if (!dateStr) return '';
+        // If it's already a JS Date (from Excel date cell)
+        if (dateStr instanceof Date) return dateStr.toISOString().split('T')[0];
+
+        // If string DD/MM/YYYY
+        if (typeof dateStr === 'string' && dateStr.includes('/')) {
+          const [d, m, y] = dateStr.split('/');
+          if (d && m && y) return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        }
+        return String(dateStr); // Fallback
+      };
+
+      // Helper to parse currency string to number
+      const parseCurrency = (val: any) => {
+        if (typeof val === 'number') return val;
+        if (!val) return 0;
+        // Remove currency symbols and allow negative numbers
+        const num = parseFloat(String(val).replace(/[^0-9.-]/g, ''));
+        return isNaN(num) ? 0 : num;
+      };
+
+      jsonData.forEach((row: any) => {
+        // Map fields based on Export headers
+        // 'Date Created', 'Airline', 'PNR', 'Agency Name', 'Agent Name',
+        // 'Dep. Date', 'Ret. Date', 'Routing', 'PAX Size', 'Status',
+        // 'Fare', 'Taxes', 'Markup', 'Total Per Pax', 'Remarks'
+
+        const airline = row['Airline'] || row['airline'] || '';
+        const pnr = row['PNR'] || row['pnr'] || '';
+
+        if (airline && pnr) { // Basic validation
+          const group: FlightGroup = {
+            id: Math.random().toString(36).substr(2, 9),
+            dateCreated: parseDate(row['Date Created']) || timestamp,
+            airline: airline,
+            pnr: String(pnr).toUpperCase(),
+            agencyName: row['Agency Name'] || row['agencyName'] || '',
+            agentName: row['Agent Name'] || row['agentName'] || '',
+            depDate: parseDate(row['Dep. Date']),
+            retDate: parseDate(row['Ret. Date']),
+            routing: row['Routing'] || '',
+            size: parseInt(row['PAX Size'] || row['size'] || '0'),
+            status: (row['Status'] || PNRStatus.PD_PNR_CREATED) as PNRStatus,
+            fare: parseCurrency(row['Fare']),
+            taxes: parseCurrency(row['Taxes']),
+            markup: parseCurrency(row['Markup']),
+            remarks: row['Remarks'] || '',
+            // Default empty for fields not in export
+            openingFeeReceipt: '',
+            depoNumber: '',
+            fPaymentEmd: '',
+            flownPassengers: 0,
+            totalPaidToEtPerTicket: 0
+          };
+          newGroups.push(group);
+          importedCount++;
+        }
+      });
+
+      if (importedCount > 0) {
+        setGroups(prev => [...prev, ...newGroups]);
+        addLog(LogAction.CREATE, 'BATCH', 'IMPORT', `Imported ${importedCount} groups from Excel`);
+        alert(`Successfully imported ${importedCount} records.`);
+      } else {
+        alert('No valid records found to import.');
+      }
+
+    } catch (err) {
+      console.error("Import Error:", err);
+      alert('Failed to import file. Please check the file format.');
+    }
+
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleCreateUser = () => {
@@ -665,9 +796,21 @@ const App: React.FC = () => {
               <h2 className="text-3xl font-black text-gray-900 flex items-center gap-4">{view === 'dashboard' ? 'Insight Analytics' : 'Group Inventory'}<span className="text-sm font-medium text-gray-400 bg-gray-100 px-3 py-1 rounded-full">{filteredGroups.length} Files</span></h2>
               <div className="flex items-center gap-3">
                 {isAdmin && (
-                  <button onClick={() => setIsExportModalOpen(true)} className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-6 py-3 rounded-2xl font-black flex items-center gap-3 shadow-sm transition-all active:scale-95">
-                    <Download className="w-5 h-5" /> Export
-                  </button>
+                  <>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      className="hidden"
+                      accept=".xlsx, .xls, .csv"
+                    />
+                    <button onClick={handleImportClick} className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-6 py-3 rounded-2xl font-black flex items-center gap-3 shadow-sm transition-all active:scale-95">
+                      <Download className="w-5 h-5 rotate-180" /> Import
+                    </button>
+                    <button onClick={() => setIsExportModalOpen(true)} className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-6 py-3 rounded-2xl font-black flex items-center gap-3 shadow-sm transition-all active:scale-95">
+                      <Download className="w-5 h-5" /> Export
+                    </button>
+                  </>
                 )}
                 {canCreate && (
                   <button onClick={() => { setFormData({ ...initialFormState, airline: userVisibleAirlines[0] }); setEditingGroup(null); setIsFormOpen(true); }} className="bg-gray-900 hover:bg-black text-white px-6 py-3 rounded-2xl font-black flex items-center gap-3 shadow-xl transition-all active:scale-95">
@@ -882,7 +1025,11 @@ const App: React.FC = () => {
                       {airlineConfigs[selectedConfigAirline]?.reminders.map((rem) => (
                         <div key={rem.id} className="grid grid-cols-12 gap-4 items-center bg-gray-50/50 p-4 rounded-2xl border">
                           <div className="col-span-5"><input className="w-full bg-white px-4 py-2 rounded-xl border text-sm font-bold" value={rem.label} onChange={e => setAirlineConfigs(p => ({ ...p, [selectedConfigAirline]: { ...p[selectedConfigAirline], reminders: p[selectedConfigAirline].reminders.map(r => r.id === rem.id ? { ...r, label: e.target.value } : r) } }))} /></div>
-                          <div className="col-span-4 flex items-center gap-2"><input type="number" className="w-20 bg-white px-4 py-2 rounded-xl border text-sm font-bold" value={rem.daysBefore} onChange={e => setAirlineConfigs(p => ({ ...p, [selectedConfigAirline]: { ...p[selectedConfigAirline], reminders: p[selectedConfigAirline].reminders.map(r => r.id === rem.id ? { ...r, daysBefore: parseInt(e.target.value) || 0 } : r) } }))} /><span className="text-[10px] font-black text-gray-400 uppercase">Days Before</span></div>
+                          <div className="col-span-4 flex items-center gap-2">
+                            <input type="number" className="w-16 bg-white px-2 py-2 rounded-xl border text-sm font-bold" value={rem.daysBefore} onChange={e => setAirlineConfigs(p => ({ ...p, [selectedConfigAirline]: { ...p[selectedConfigAirline], reminders: p[selectedConfigAirline].reminders.map(r => r.id === rem.id ? { ...r, daysBefore: parseInt(e.target.value) || 0 } : r) } }))} />
+                            <input type="time" className="w-24 bg-white px-2 py-2 rounded-xl border text-sm font-bold" value={rem.time || '09:00'} onChange={e => setAirlineConfigs(p => ({ ...p, [selectedConfigAirline]: { ...p[selectedConfigAirline], reminders: p[selectedConfigAirline].reminders.map(r => r.id === rem.id ? { ...r, time: e.target.value } : r) } }))} />
+                            <span className="text-[10px] font-black text-gray-400 uppercase">Days / Time</span>
+                          </div>
                           <div className="col-span-3"><button onClick={() => setAirlineConfigs(p => ({ ...p, [selectedConfigAirline]: { ...p[selectedConfigAirline], reminders: p[selectedConfigAirline].reminders.map(r => r.id === rem.id ? { ...r, active: !r.active } : r) } }))} className={`w-full py-2 rounded-xl font-black text-xs ${rem.active ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-400'}`}>{rem.active ? 'Active' : 'Off'}</button></div>
                         </div>
                       ))}
