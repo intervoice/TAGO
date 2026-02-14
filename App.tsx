@@ -30,7 +30,7 @@ const App: React.FC = () => {
   const [exportSelectedAirlines, setExportSelectedAirlines] = useState<string[]>([]);
   const [isRemindersOpen, setIsRemindersOpen] = useState(false);
   const [isUserMgmtOpen, setIsUserMgmtOpen] = useState(false);
-  const [adminTab, setAdminTab] = useState<'users' | 'airlines' | 'email' | 'logs'>('users');
+  const [adminTab, setAdminTab] = useState<'users' | 'airlines' | 'email' | 'logs' | 'backup'>('users');
   const [selectedConfigAirline, setSelectedConfigAirline] = useState<AirlineCode>('ET');
 
   const [newAirlineCode, setNewAirlineCode] = useState('');
@@ -611,6 +611,76 @@ const App: React.FC = () => {
   };
   const [formData, setFormData] = useState<Partial<FlightGroup>>(initialFormState);
 
+  const handleSystemExport = () => {
+    const backupData = {
+      timestamp: new Date().toISOString(),
+      version: '1.0',
+      data: {
+        flight_groups_v3: groups,
+        system_audit_logs_v1: logs,
+        airline_list_v1: airlines,
+        airline_configs_v1: airlineConfigs,
+        email_integration_v1: emailSettings,
+        system_users: users
+      }
+    };
+
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `TAGO_Backup_${new Date().toLocaleDateString('en-CA')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    addLog(LogAction.CREATE, 'SYSTEM', 'BACKUP', 'System backup exported');
+  };
+
+  const fileInputBackupRef = useRef<HTMLInputElement>(null);
+
+  const handleSystemImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!window.confirm('WARNING: This will OVERWRITE current system data with the backup file. This action cannot be undone. Are you sure?')) {
+      if (fileInputBackupRef.current) fileInputBackupRef.current.value = '';
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const backup = JSON.parse(text);
+
+      if (!backup.data || !backup.version) {
+        throw new Error('Invalid backup file format');
+      }
+
+      // Restore data keys
+      const restoreKey = async (key: string, data: any) => {
+        if (data) await storage.set(key, data);
+      };
+
+      await restoreKey('flight_groups_v3', backup.data.flight_groups_v3);
+      await restoreKey('system_audit_logs_v1', backup.data.system_audit_logs_v1);
+      await restoreKey('airline_list_v1', backup.data.airline_list_v1);
+      await restoreKey('airline_configs_v1', backup.data.airline_configs_v1);
+      await restoreKey('email_integration_v1', backup.data.email_integration_v1);
+      await restoreKey('system_users', backup.data.system_users);
+
+      addLog(LogAction.UPDATE, 'SYSTEM', 'RESTORE', 'System restored from backup');
+      alert('System restored successfully! The page will now reload.');
+      window.location.reload();
+
+    } catch (err) {
+      console.error('Restore failed:', err);
+      alert('Failed to restore backup: ' + err);
+    }
+
+    if (fileInputBackupRef.current) fileInputBackupRef.current.value = '';
+  };
+
   const handleSave = () => {
     if (editingGroup) {
       // Robust change detection for every field
@@ -937,11 +1007,12 @@ const App: React.FC = () => {
         <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
             <div className="p-8 border-b flex justify-between items-center bg-white"><div className="flex items-center gap-3"><ShieldCheck className="w-7 h-7 text-blue-600" /><h3 className="text-2xl font-black">Configuration</h3></div><button onClick={() => setIsUserMgmtOpen(false)} className="text-gray-400 bg-gray-100 p-2 rounded-full"><X className="w-6 h-6" /></button></div>
-            <div className="flex border-b bg-gray-50/50">
-              <button onClick={() => setAdminTab('users')} className={`px-8 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${adminTab === 'users' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-400'}`}>Users</button>
-              <button onClick={() => setAdminTab('airlines')} className={`px-8 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${adminTab === 'airlines' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-400'}`}>Airlines & Currency</button>
-              <button onClick={() => setAdminTab('email')} className={`px-8 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${adminTab === 'email' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-400'}`}>Email Integration</button>
-              <button onClick={() => setAdminTab('logs')} className={`px-8 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${adminTab === 'logs' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-400'}`}>System Logs</button>
+            <div className="flex border-b bg-gray-50/50 overflow-x-auto">
+              <button onClick={() => setAdminTab('users')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 whitespace-nowrap ${adminTab === 'users' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-400'}`}>Users</button>
+              <button onClick={() => setAdminTab('airlines')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 whitespace-nowrap ${adminTab === 'airlines' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-400'}`}>Airlines & Currency</button>
+              <button onClick={() => setAdminTab('email')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 whitespace-nowrap ${adminTab === 'email' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-400'}`}>Email Integration</button>
+              <button onClick={() => setAdminTab('logs')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 whitespace-nowrap ${adminTab === 'logs' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-400'}`}>System Logs</button>
+              <button onClick={() => setAdminTab('backup')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 whitespace-nowrap ${adminTab === 'backup' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-400'}`}>Backup & Restore</button>
             </div>
             <div className="p-8 flex-1 overflow-y-auto">
               {adminTab === 'users' ? (
@@ -1147,7 +1218,7 @@ const App: React.FC = () => {
                     )}
                   </div>
                 </div>
-              ) : (
+              ) : adminTab === 'email' ? (
                 <div className="max-w-2xl mx-auto space-y-8 animate-in slide-in-from-bottom-4">
                   <div className="bg-amber-50 border border-amber-200 p-6 rounded-[2rem] flex gap-4">
                     <Lock className="w-6 h-6 text-amber-600 shrink-0" />
@@ -1211,7 +1282,32 @@ const App: React.FC = () => {
                     </p>
                   </div>
                 </div>
-              )}
+              ) : adminTab === 'backup' ? (
+                <div className="max-w-2xl mx-auto space-y-8 animate-in slide-in-from-bottom-4">
+                  <div className="bg-amber-50 border border-amber-200 p-6 rounded-[2rem] flex gap-4">
+                    <div className="flex flex-col gap-2">
+                      <h4 className="font-black text-amber-900 flex items-center gap-2"><div className="bg-amber-100 p-2 rounded-lg"><Download className="w-4 h-4 text-amber-600" /></div> System Backup</h4>
+                      <p className="text-sm text-amber-800">Download a full JSON copy of the system database (Users, Flights, Settings, Logs). Keep this file safe.</p>
+                      <button onClick={handleSystemExport} className="mt-2 w-full py-4 bg-amber-600 text-white font-black rounded-xl shadow-lg hover:bg-amber-700 transition-all active:scale-95">Download Backup File</button>
+                    </div>
+                  </div>
+
+                  <div className="bg-rose-50 border border-rose-200 p-6 rounded-[2rem] flex gap-4">
+                    <div className="flex flex-col gap-2 w-full">
+                      <h4 className="font-black text-rose-900 flex items-center gap-2"><div className="bg-rose-100 p-2 rounded-lg"><History className="w-4 h-4 text-rose-600" /></div> Restore System</h4>
+                      <p className="text-sm text-rose-800">Upload a backup file to restore the system state. <strong className="block mt-1">⚠️ THIS WILL OVERWRITE ALL CURRENT DATA!</strong></p>
+                      <input
+                        type="file"
+                        ref={fileInputBackupRef}
+                        onChange={handleSystemImport}
+                        className="hidden"
+                        accept=".json"
+                      />
+                      <button onClick={() => fileInputBackupRef.current?.click()} className="mt-2 w-full py-4 bg-white border-2 border-rose-200 text-rose-600 font-black rounded-xl hover:bg-rose-100 transition-all active:scale-95">Upload & Restore Backup</button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
