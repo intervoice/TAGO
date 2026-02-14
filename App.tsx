@@ -284,9 +284,11 @@ const App: React.FC = () => {
       const config = airlineConfigs[group.airline];
       if (config) {
         config.reminders.forEach(cr => {
-          if (cr.active && cr.label && cr.daysBefore > 0) {
+          // Reminder is valid if it is Active, DaysBefore >= 0 (allow same-day reminders)
+          if (cr.active && cr.label && cr.daysBefore >= 0) {
             const triggerDate = subtractDays(depDate, cr.daysBefore);
-            if (triggerDate <= addDays(today, 2) && group.status !== PNRStatus.OK_ISSUED && !group.status.startsWith('XX')) {
+            // STRICT DATE MATCHING: Only show reminder if today IS the trigger date
+            if (triggerDate.toDateString() === today.toDateString() && group.status !== PNRStatus.OK_ISSUED && !group.status.startsWith('XX')) {
               list.push({
                 type: 'AIRLINE_CUSTOM', dueDate: triggerDate.toISOString(), pnr: group.pnr,
                 agency: group.agencyName, description: `${cr.label} (${group.airline})`, isOverdue: triggerDate < today,
