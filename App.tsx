@@ -127,7 +127,7 @@ const App: React.FC = () => {
             usersData = JSON.parse(local);
           } else {
             usersData = [{
-              id: 'admin-1', username: 'admin', password: 'TalTufa', role: UserRole.ADMIN, fullName: 'System Administrator',
+              id: 'admin-1', username: 'admin', password: 'TalTeufa', role: UserRole.ADMIN, fullName: 'System Administrator',
               allowedAirlines: airlinesData
             }];
           }
@@ -136,7 +136,7 @@ const App: React.FC = () => {
 
         // FORCE PASSWORD UPDATE to avoid sync issues
         usersData = usersData.map((u: any) =>
-          u.username === 'admin' ? { ...u, password: 'TalTufa' } : u
+          u.username === 'admin' ? { ...u, password: 'TalTeufa' } : u
         );
 
         setUsers(usersData);
@@ -896,7 +896,7 @@ const App: React.FC = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
               <h2 className="text-3xl font-black text-gray-900 flex items-center gap-4">{view === 'dashboard' ? 'Insight Analytics' : 'Group Inventory'}<span className="text-sm font-medium text-gray-400 bg-gray-100 px-3 py-1 rounded-full">{filteredGroups.length} Files</span></h2>
               <div className="flex items-center gap-3">
-                {isAdmin && (
+                {canCreate && (
                   <>
                     <input
                       type="file"
