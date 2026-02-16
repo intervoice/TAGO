@@ -8,6 +8,7 @@ import { GroupTable } from './components/GroupTable';
 import { Dashboard } from './components/Dashboard';
 import { UserGuide } from './components/UserGuide';
 import { Plus, Search, LogOut, Plane, X, Save, Mail, Trash2, Bell, ChevronRight, LayoutDashboard, Table as TableIcon, Settings, User as UserIcon, ShieldCheck, Key, Building2, Clock, CheckCircle as CheckCircleIcon, Coins, Globe, Lock, Filter, Download, FileText, CheckSquare, Square, BookOpen, Users, History, ChevronDown, ChevronUp, SearchCode, Calendar } from 'lucide-react';
+import { DateInput } from './components/DateInput';
 import { storage } from './storage';
 
 const App: React.FC = () => {
@@ -995,8 +996,8 @@ const App: React.FC = () => {
                   <label className="block col-span-1"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Seats (PAX)</span><input type="number" className="w-full rounded-2xl bg-gray-50 p-4 font-black outline-none" value={formData.size || ''} onChange={e => updateField('size', parseInt(e.target.value) || 0)} /></label>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Dep. Date</span><input type="date" className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.depDate?.split('T')[0] || ''} onChange={e => updateField('depDate', e.target.value)} /></label>
-                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Ret. Date</span><input type="date" className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.retDate?.split('T')[0] || ''} onChange={e => updateField('retDate', e.target.value)} /></label>
+                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Dep. Date</span><DateInput className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.depDate?.split('T')[0] || ''} onChange={(val) => updateField('depDate', val)} /></label>
+                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Ret. Date</span><DateInput className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.retDate?.split('T')[0] || ''} onChange={(val) => updateField('retDate', val)} /></label>
                 </div>
                 <div className="grid grid-cols-1 gap-4">
                   <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Routing (e.g. TLV-ADD-CPT)</span><input className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.routing || ''} onChange={e => updateField('routing', e.target.value)} /></label>
@@ -1018,8 +1019,8 @@ const App: React.FC = () => {
                   </label>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Record by Agent</span><input type="date" className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.recordByAgent || ''} onChange={e => updateField('recordByAgent', e.target.value)} /></label>
-                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Date Sent (Airline)</span><input type="date" className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.dateSentToAirline || ''} onChange={e => updateField('dateSentToAirline', e.target.value)} /></label>
+                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Record by Agent</span><DateInput className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.recordByAgent || ''} onChange={(val) => updateField('recordByAgent', val)} /></label>
+                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Date Sent (Airline)</span><DateInput className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.dateSentToAirline || ''} onChange={(val) => updateField('dateSentToAirline', val)} /></label>
                 </div>
               </div>
               <div className="space-y-6">
@@ -1033,7 +1034,7 @@ const App: React.FC = () => {
                     <div className="col-span-3 text-[10px] font-bold text-gray-500 uppercase">Deposit</div>
                     <div className="col-span-5">
                       <label className="block text-[9px] text-gray-400 uppercase">Date</label>
-                      <input type="date" className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.depositDate || ''} onChange={e => updateField('depositDate', e.target.value)} />
+                      <DateInput className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.depositDate || ''} onChange={(val) => updateField('depositDate', val)} />
                     </div>
                     <div className="col-span-4">
                       <label className="block text-[9px] text-gray-400 uppercase">Days Before</label>
@@ -1045,7 +1046,7 @@ const App: React.FC = () => {
                   <div className="grid grid-cols-12 gap-2 items-end">
                     <div className="col-span-3 text-[10px] font-bold text-gray-500 uppercase">Full Pay</div>
                     <div className="col-span-5">
-                      <input type="date" className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.fullPaymentDate || ''} onChange={e => updateField('fullPaymentDate', e.target.value)} />
+                      <DateInput className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.fullPaymentDate || ''} onChange={(val) => updateField('fullPaymentDate', val)} />
                     </div>
                     <div className="col-span-4">
                       <input type="number" placeholder="Days" className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.fullPaymentDaysBefore} onChange={e => updateField('fullPaymentDaysBefore', parseInt(e.target.value) || 0)} />
@@ -1056,7 +1057,7 @@ const App: React.FC = () => {
                   <div className="grid grid-cols-12 gap-2 items-end">
                     <div className="col-span-3 text-[10px] font-bold text-gray-500 uppercase">Names</div>
                     <div className="col-span-5">
-                      <input type="date" className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.namesDate || ''} onChange={e => updateField('namesDate', e.target.value)} />
+                      <DateInput className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.namesDate || ''} onChange={(val) => updateField('namesDate', val)} />
                     </div>
                     <div className="col-span-4">
                       <input type="number" placeholder="Days" className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.namesDaysBefore} onChange={e => updateField('namesDaysBefore', parseInt(e.target.value) || 0)} />
