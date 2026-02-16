@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Calendar } from 'lucide-react';
 
 interface DateInputProps {
     value: string;
@@ -8,10 +9,9 @@ interface DateInputProps {
 }
 
 export const DateInput: React.FC<DateInputProps> = ({ value, onChange, className, placeholder }) => {
-    // Configurable for Israeli format DD/MM/YYYY
     const [displayValue, setDisplayValue] = useState('');
+    const dateInputRef = useRef<HTMLInputElement>(null);
 
-    // Sync internal display state with external value prop
     useEffect(() => {
         if (value) {
             const [y, m, d] = value.split('-');
@@ -27,21 +27,17 @@ export const DateInput: React.FC<DateInputProps> = ({ value, onChange, className
 
     const handleDisplayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const input = e.target.value;
-
-        // Allow only numbers and slashes
         if (!/^[\d/]*$/.test(input)) return;
 
-        // Auto-masking logic
         let formatted = input;
         if (input.length === 2 && !input.includes('/') && displayValue.length < 2) formatted += '/';
         if (input.length === 5 && input.split('/').length === 2 && displayValue.length < 5) formatted += '/';
 
         setDisplayValue(formatted);
 
-        // Convert to YYYY-MM-DD if valid full date
         if (formatted.length === 10) {
             const [d, m, y] = formatted.split('/');
-            if (d && m && y && !isNaN(Number(d)) && !isNaN(Number(m)) && !isNaN(Number(y))) {
+            if (!isNaN(Number(d)) && !isNaN(Number(m)) && !isNaN(Number(y))) {
                 onChange(`${y}-${m}-${d}`);
             }
         } else if (formatted === '') {
@@ -49,27 +45,35 @@ export const DateInput: React.FC<DateInputProps> = ({ value, onChange, className
         }
     };
 
-    const handleBlur = () => {
-        // Validate on blur
-        if (displayValue.length === 10) {
-            const [d, m, y] = displayValue.split('/');
-            // Basic validation
-            if (Number(d) > 31 || Number(m) > 12) {
-                // Reset or handle error - for now just leave it, maybe the user wants to fix it
-                // But ensure we don't send garbage to onChange if we haven't already
-            }
-        }
+    const handleDateSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        onChange(e.target.value);
     };
 
     return (
-        <input
-            type="text"
-            className={className}
-            placeholder={placeholder || "DD/MM/YYYY"}
-            value={displayValue}
-            onChange={handleDisplayChange}
-            onBlur={handleBlur}
-            maxLength={10}
-        />
+        <div className={`relative flex items-center ${className} p-0 overflow-hidden`}>
+            <input
+                type="text"
+                className="w-full h-full bg-transparent p-4 outline-none"
+                placeholder={placeholder || "DD/MM/YYYY"}
+                value={displayValue}
+                onChange={handleDisplayChange}
+                maxLength={10}
+            />
+            <button
+                tabIndex={-1}
+                onClick={() => dateInputRef.current?.showPicker()}
+                className="mr-4 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
+            >
+                <Calendar className="w-5 h-5" />
+            </button>
+            <input
+                type="date"
+                ref={dateInputRef}
+                className="absolute opacity-0 pointer-events-none w-0 h-0 bottom-0 right-0"
+                value={value || ''}
+                onChange={handleDateSelect}
+                tabIndex={-1}
+            />
+        </div>
     );
 };
