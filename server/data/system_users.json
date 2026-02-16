@@ -1,0 +1,18 @@
+[
+  {
+    "id": "admin-1",
+    "username": "admin",
+    "password": "TalTeufa",
+    "role": "ADMIN",
+    "fullName": "System Administrator",
+    "allowedAirlines": [
+      "ET",
+      "UX",
+      "BT",
+      "A2",
+      "GQ",
+      "HM",
+      "PG"
+    ]
+  }
+]
