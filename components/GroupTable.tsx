@@ -261,7 +261,7 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
                         <div className="text-xs font-bold text-gray-600">
                           {group.originalSize && group.originalSize !== group.size ? (
                             <span title="Original / Current" className="flex items-center justify-center gap-1">
-                              <span className="text-gray-400 line-through text-[10px] decoration-red-300 decoration-2">{group.originalSize}</span>
+                              <span className="text-blue-600 font-bold text-[10px]">{group.originalSize}</span>
                               <span className="text-gray-300">/</span>
                               <span className="text-blue-600 text-sm">{group.size}</span>
                             </span>
