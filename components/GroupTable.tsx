@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { FlightGroup, PNRStatus, UserRole, AirlineConfig } from '../types';
 import { formatDate, STATUS_LIST, CURRENCY_SYMBOLS } from '../constants';
 import { Edit2, Trash2, X, Lock, Check, ChevronLeft, ChevronRight, ListFilter } from 'lucide-react';
+import { DateInput } from './DateInput';
 
 interface GroupTableProps {
   groups: FlightGroup[];
@@ -189,8 +190,8 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
                 <td className="p-2"><input className="w-full text-[10px] p-1 border rounded bg-gray-50 outline-none" placeholder="Agent" value={filters.agent} onChange={(e) => handleFilterChange('agent', e.target.value)} /></td>
                 <td className="p-2">
                   <div className="flex flex-col gap-1">
-                    <input type="date" className="w-full text-[9px] p-0.5 border rounded bg-gray-50 outline-none" placeholder="From" value={filters.startDate} onChange={(e) => handleFilterChange('startDate', e.target.value)} />
-                    <input type="date" className="w-full text-[9px] p-0.5 border rounded bg-gray-50 outline-none" placeholder="To" value={filters.endDate} onChange={(e) => handleFilterChange('endDate', e.target.value)} />
+                    <DateInput className="w-full text-[9px] p-0.5 border rounded bg-gray-50 outline-none" placeholder="From" value={filters.startDate} onChange={(val) => handleFilterChange('startDate', val)} />
+                    <DateInput className="w-full text-[9px] p-0.5 border rounded bg-gray-50 outline-none" placeholder="To" value={filters.endDate} onChange={(val) => handleFilterChange('endDate', val)} />
                   </div>
                 </td>
                 <td className="p-2"></td>
