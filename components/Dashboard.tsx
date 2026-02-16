@@ -16,6 +16,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ groups, airlines }) => {
     markup: true // Default as per request
   });
 
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+
+  const REVENUE_STATUSES = [
+    PNRStatus.OK_COMMITTED,
+    PNRStatus.OK_DEPOSIT_PAID,
+    PNRStatus.FULL_PAY_EMD,
+    PNRStatus.OK_ISSUED,
+    PNRStatus.OK_CONFIRMED // Added new status
+  ];
+
+  const filteredGroups = useMemo(() => {
+    return groups.filter(g => {
+      if (dateRange.start && g.depDate < dateRange.start) return false;
+      if (dateRange.end && g.depDate > dateRange.end) return false;
+      return true;
+    });
+  }, [groups, dateRange]);
+
   const toggleMetric = (key: keyof typeof selectedMetrics) => {
     setSelectedMetrics(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -30,34 +48,37 @@ export const Dashboard: React.FC<DashboardProps> = ({ groups, airlines }) => {
 
   const stats = useMemo(() => {
     return {
-      totalGroups: groups.length,
-      totalPassengers: groups.reduce((acc, g) => acc + (Number(g.size) || 0), 0),
-      totalRevenue: groups.reduce((acc, g) => acc + calculateTotal(g), 0),
-      activeGroups: groups.filter(g => g.status.startsWith('OK')).length,
-      pendingGroups: groups.filter(g => g.status.startsWith('PD')).length,
-      cancelledGroups: groups.filter(g => g.status.startsWith('XX')).length,
+      totalGroups: filteredGroups.length,
+      totalPassengers: filteredGroups.reduce((acc, g) => REVENUE_STATUSES.includes(g.status) ? acc + (Number(g.size) || 0) : acc, 0),
+      totalRevenue: filteredGroups.reduce((acc, g) => REVENUE_STATUSES.includes(g.status) ? acc + calculateTotal(g) : acc, 0),
+      activeGroups: filteredGroups.filter(g => g.status.startsWith('OK')).length,
+      pendingGroups: filteredGroups.filter(g => g.status.startsWith('PD')).length,
+      cancelledGroups: filteredGroups.filter(g => g.status.startsWith('XX')).length,
     };
-  }, [groups, selectedMetrics]);
+  }, [filteredGroups, selectedMetrics]);
 
   // Use airlines from props instead of non-existent AIRLINES constant
   const airlineCounts = useMemo(() => {
     return airlines.map(al => ({
       name: al,
-      count: groups.filter(g => g.airline === al).length,
-      passengers: groups.filter(g => g.airline === al).reduce((acc, g) => acc + (Number(g.size) || 0), 0)
+      count: filteredGroups.filter(g => g.airline === al).length,
+      passengers: filteredGroups.filter(g => g.airline === al && REVENUE_STATUSES.includes(g.status)).reduce((acc, g) => acc + (Number(g.size) || 0), 0)
     })).sort((a, b) => b.count - a.count);
-  }, [groups, airlines]);
+  }, [filteredGroups, airlines]);
 
   const topAgencies = useMemo(() => {
     const agencyMap = new Map<string, { count: number; passengers: number; revenue: number }>();
 
-    groups.forEach(g => {
+    filteredGroups.forEach(g => {
       if (!g.agencyName) return;
+      // Only sum Revenue/Pax if status matches
+      const includeInSums = REVENUE_STATUSES.includes(g.status);
+
       const current = agencyMap.get(g.agencyName) || { count: 0, passengers: 0, revenue: 0 };
       agencyMap.set(g.agencyName, {
         count: current.count + 1,
-        passengers: current.passengers + (Number(g.size) || 0),
-        revenue: current.revenue + calculateTotal(g)
+        passengers: current.passengers + (includeInSums ? (Number(g.size) || 0) : 0),
+        revenue: current.revenue + (includeInSums ? calculateTotal(g) : 0)
       });
     });
 
@@ -65,7 +86,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ groups, airlines }) => {
       .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
-  }, [groups, selectedMetrics]);
+  }, [filteredGroups, selectedMetrics]);
 
   const monthlyStats = useMemo(() => {
     const last12Months = Array.from({ length: 12 }, (_, i) => {
@@ -80,18 +101,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ groups, airlines }) => {
     }).reverse();
 
     return last12Months.map(m => {
-      const monthGroups = groups.filter(g => {
+      const monthGroups = filteredGroups.filter(g => {
         const d = new Date(g.depDate);
         return d.getFullYear() === m.year && d.getMonth() === m.month;
       });
 
       return {
         label: m.label,
-        revenue: monthGroups.reduce((acc, g) => acc + calculateTotal(g), 0),
-        passengers: monthGroups.reduce((acc, g) => acc + (Number(g.size) || 0), 0)
+        revenue: monthGroups.reduce((acc, g) => REVENUE_STATUSES.includes(g.status) ? acc + calculateTotal(g) : acc, 0),
+        passengers: monthGroups.reduce((acc, g) => REVENUE_STATUSES.includes(g.status) ? acc + (Number(g.size) || 0) : acc, 0)
       };
     });
-  }, [groups, selectedMetrics]);
+  }, [filteredGroups, selectedMetrics]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-10">
@@ -99,7 +120,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ groups, airlines }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
         <div>
           <h2 className="text-2xl font-black text-gray-900">Statistics Dashboard</h2>
-          <p className="text-gray-500 text-sm font-medium">Overview of performance and metrics</p>
+          <div className="flex items-center gap-2 mt-1">
+            <input type="date" className="bg-gray-50 border-none rounded-lg text-[10px] font-bold py-1 px-2 outline-none" value={dateRange.start} onChange={e => setDateRange(p => ({ ...p, start: e.target.value }))} />
+            <span className="text-gray-300">-</span>
+            <input type="date" className="bg-gray-50 border-none rounded-lg text-[10px] font-bold py-1 px-2 outline-none" value={dateRange.end} onChange={e => setDateRange(p => ({ ...p, end: e.target.value }))} />
+            {(dateRange.start || dateRange.end) && <button onClick={() => setDateRange({ start: '', end: '' })} className="text-[10px] font-black text-red-400 hover:text-red-500 uppercase ml-2">Clear</button>}
+          </div>
         </div>
 
         <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-2xl border border-gray-200">
@@ -112,8 +138,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ groups, airlines }) => {
               key={key}
               onClick={() => toggleMetric(key)}
               className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${selectedMetrics[key]
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
-                  : 'text-gray-400 hover:bg-gray-100'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
+                : 'text-gray-400 hover:bg-gray-100'
                 }`}
             >
               {key}

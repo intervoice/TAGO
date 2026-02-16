@@ -8,6 +8,7 @@ export enum PNRStatus {
   XX_CANCELLED_HDQ = 'XX Cancelled HDQ',
   XX_CANCELLED_AG = 'XX Canceled by AG',
   XX_CANCELLED_AIRLINE = 'XX Canceled by airline',
+  OK_CONFIRMED = 'OK Confirmed',
   OK_CONTRACT_SENT = 'OK Contract Sent',
   OK_CONTRACT_SIGNED = 'OK Contract Signed',
   OK_COMM_REMINDER = 'OK Sent first comm reminder',
@@ -77,8 +78,21 @@ export interface FlightGroup {
   retDate?: string;
   routing: string;
   size: number;
+  originalSize?: number; // Track initial size
   status: PNRStatus;
   dateOfferSent?: string;
+  // New tracking fields
+  recordByAgent?: string;
+  dateSentToAirline?: string;
+  
+  // Specific alerts
+  depositDate?: string;
+  depositDaysBefore?: number;
+  fullPaymentDate?: string;
+  fullPaymentDaysBefore?: number;
+  namesDate?: string;
+  namesDaysBefore?: number;
+
   remarks: string;
   openingFeeReceipt: string;
   depoNumber: string;

@@ -107,9 +107,7 @@ const App: React.FC = () => {
                 recipientEmail: '',
                 currency: al === 'A2' ? 'EUR' : 'USD',
                 reminders: [
-                  { id: '1', label: 'Deposit Deadline', daysBefore: 66, time: '09:00', active: false },
-                  { id: '2', label: 'Full Payment', daysBefore: 36, time: '09:00', active: false },
-                  { id: '3', label: 'Names Request', daysBefore: 18, time: '09:00', active: false }
+                  // reminders: [] // Deprecated global reminders
                 ]
               };
             });
@@ -128,12 +126,18 @@ const App: React.FC = () => {
             usersData = JSON.parse(local);
           } else {
             usersData = [{
-              id: 'admin-1', username: 'admin', password: 'TalTeufa', role: UserRole.ADMIN, fullName: 'System Administrator',
+              id: 'admin-1', username: 'admin', password: 'TalTufa', role: UserRole.ADMIN, fullName: 'System Administrator',
               allowedAirlines: airlinesData
             }];
           }
           await storage.set('system_users', usersData);
         }
+
+        // FORCE PASSWORD UPDATE to avoid sync issues
+        usersData = usersData.map((u: any) =>
+          u.username === 'admin' ? { ...u, password: 'TalTufa' } : u
+        );
+
         setUsers(usersData);
 
         // Session is local only
@@ -274,10 +278,13 @@ const App: React.FC = () => {
 
   const reminders = useMemo(() => {
     const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
     const list: Reminder[] = [];
+
     groups.forEach(group => {
       if (!userVisibleAirlines.includes(group.airline)) return;
-      const depDate = new Date(group.depDate);
+
+      // 1. Offer Follow-up
       if (group.dateOfferSent && group.status === PNRStatus.PD_PROP_SENT) {
         const fupDate = addDays(new Date(group.dateOfferSent), 7);
         if (fupDate <= addDays(today, 2)) list.push({
@@ -286,26 +293,28 @@ const App: React.FC = () => {
           emailTemplate: getEmailTemplate('OFFER_FOLLOWUP', group)
         });
       }
-      const config = airlineConfigs[group.airline];
-      if (config) {
-        config.reminders.forEach(cr => {
-          // Reminder is valid if it is Active, DaysBefore >= 0 (allow same-day reminders)
-          if (cr.active && cr.label && cr.daysBefore >= 0) {
-            const triggerDate = subtractDays(depDate, cr.daysBefore);
-            // STRICT DATE MATCHING: Only show reminder if today IS the trigger date
-            if (triggerDate.toDateString() === today.toDateString() && group.status !== PNRStatus.OK_ISSUED && !group.status.startsWith('XX')) {
-              list.push({
-                type: 'AIRLINE_CUSTOM', dueDate: triggerDate.toISOString(), pnr: group.pnr,
-                agency: group.agencyName, description: `${cr.label} (${group.airline})`, isOverdue: triggerDate < today,
-                emailTemplate: `Dear ${config.recipientEmail || 'Team'},\n\nReminder for ${cr.label} regarding PNR ${group.pnr}.`
-              });
-            }
-          }
-        });
-      }
+
+      // 2. Per-Group Alerts
+      const checkAlert = (label: string, dateStr?: string, daysBefore?: number) => {
+        if (!dateStr || daysBefore === undefined || daysBefore === null) return;
+        const targetDate = new Date(dateStr);
+        const triggerDate = subtractDays(targetDate, daysBefore);
+        // Compare dates only
+        if (triggerDate.toISOString().split('T')[0] === todayStr) {
+          list.push({
+            type: 'GROUP_ALERT', dueDate: triggerDate.toISOString(), pnr: group.pnr,
+            agency: group.agencyName, description: `${label} Alert`, isOverdue: false,
+            emailTemplate: `Reminder: ${label} for PNR ${group.pnr} is due on ${formatDate(dateStr)}.`
+          });
+        }
+      };
+
+      checkAlert('Deposit', group.depositDate, group.depositDaysBefore);
+      checkAlert('Full Payment', group.fullPaymentDate, group.fullPaymentDaysBefore);
+      checkAlert('Names', group.namesDate, group.namesDaysBefore);
     });
     return list;
-  }, [groups, airlineConfigs, userVisibleAirlines]);
+  }, [groups, userVisibleAirlines]);
 
   const filteredGroups = useMemo(() => {
     return groups
@@ -474,9 +483,7 @@ const App: React.FC = () => {
           recipientEmail: '',
           currency: 'USD',
           reminders: [
-            { id: '1', label: 'Deposit Deadline', daysBefore: 66, time: '09:00', active: false },
-            { id: '2', label: 'Full Payment', daysBefore: 36, time: '09:00', active: false },
-            { id: '3', label: 'Names Request', daysBefore: 18, time: '09:00', active: false }
+            // reminders: [] // Deprecated
           ]
         }
       }));
@@ -720,7 +727,12 @@ const App: React.FC = () => {
 
       setGroups(prev => prev.map(g => g.id === editingGroup.id ? { ...g, ...formData } as FlightGroup : g));
     } else {
-      const newGroup: FlightGroup = { ...formData, id: Math.random().toString(36).substr(2, 9), dateCreated: new Date().toISOString() } as FlightGroup;
+      const newGroup: FlightGroup = {
+        ...formData,
+        id: Math.random().toString(36).substr(2, 9),
+        dateCreated: new Date().toISOString(),
+        originalSize: formData.size // Set original size
+      } as FlightGroup;
       if (newGroup.status === PNRStatus.PD_PROP_SENT) newGroup.dateOfferSent = new Date().toISOString();
 
       addLog(LogAction.CREATE, newGroup.id, newGroup.pnr, `Created new group for ${newGroup.agencyName}`);
@@ -994,8 +1006,52 @@ const App: React.FC = () => {
                     </datalist>
                   </label>
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Record by Agent</span><input type="date" className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.recordByAgent || ''} onChange={e => updateField('recordByAgent', e.target.value)} /></label>
+                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Date Sent (Airline)</span><input type="date" className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.dateSentToAirline || ''} onChange={e => updateField('dateSentToAirline', e.target.value)} /></label>
+                </div>
               </div>
               <div className="space-y-6">
+
+                {/* Alerts Section */}
+                <div className="bg-blue-50/50 p-4 rounded-3xl space-y-4 border border-blue-100">
+                  <h4 className="text-xs font-black text-blue-500 uppercase flex items-center gap-2"><Bell className="w-3 h-3" /> Alerts</h4>
+
+                  {/* Deposit */}
+                  <div className="grid grid-cols-12 gap-2 items-end">
+                    <div className="col-span-3 text-[10px] font-bold text-gray-500 uppercase">Deposit</div>
+                    <div className="col-span-5">
+                      <label className="block text-[9px] text-gray-400 uppercase">Date</label>
+                      <input type="date" className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.depositDate || ''} onChange={e => updateField('depositDate', e.target.value)} />
+                    </div>
+                    <div className="col-span-4">
+                      <label className="block text-[9px] text-gray-400 uppercase">Days Before</label>
+                      <input type="number" placeholder="Days" className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.depositDaysBefore} onChange={e => updateField('depositDaysBefore', parseInt(e.target.value) || 0)} />
+                    </div>
+                  </div>
+
+                  {/* Full Payment */}
+                  <div className="grid grid-cols-12 gap-2 items-end">
+                    <div className="col-span-3 text-[10px] font-bold text-gray-500 uppercase">Full Pay</div>
+                    <div className="col-span-5">
+                      <input type="date" className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.fullPaymentDate || ''} onChange={e => updateField('fullPaymentDate', e.target.value)} />
+                    </div>
+                    <div className="col-span-4">
+                      <input type="number" placeholder="Days" className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.fullPaymentDaysBefore} onChange={e => updateField('fullPaymentDaysBefore', parseInt(e.target.value) || 0)} />
+                    </div>
+                  </div>
+
+                  {/* Names */}
+                  <div className="grid grid-cols-12 gap-2 items-end">
+                    <div className="col-span-3 text-[10px] font-bold text-gray-500 uppercase">Names</div>
+                    <div className="col-span-5">
+                      <input type="date" className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.namesDate || ''} onChange={e => updateField('namesDate', e.target.value)} />
+                    </div>
+                    <div className="col-span-4">
+                      <input type="number" placeholder="Days" className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.namesDaysBefore} onChange={e => updateField('namesDaysBefore', parseInt(e.target.value) || 0)} />
+                    </div>
+                  </div>
+                </div>
                 <div className="grid grid-cols-3 gap-4">
                   <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Fare ({CURRENCY_SYMBOLS[airlineConfigs[formData.airline || '']?.currency || 'USD']})</span><input type="number" className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.fare || ''} onChange={e => updateField('fare', parseFloat(e.target.value) || 0)} /></label>
                   <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Tax</span><input type="number" className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.taxes || ''} onChange={e => updateField('taxes', parseFloat(e.target.value) || 0)} /></label>
@@ -1097,20 +1153,6 @@ const App: React.FC = () => {
                           <button onClick={() => sendEmail(airlineConfigs[selectedConfigAirline]?.recipientEmail || '', 'Test Email', 'This is a test email from TAGO.')} className="px-4 bg-blue-600 text-white rounded-xl font-bold text-xs hover:bg-blue-700 transition-colors">Test</button>
                         </div>
                       </div>
-                    </div>
-                    <div className="space-y-4">
-                      <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><Clock className="w-4 h-4" /> Reminders</h4>
-                      {airlineConfigs[selectedConfigAirline]?.reminders.map((rem) => (
-                        <div key={rem.id} className="grid grid-cols-12 gap-4 items-center bg-gray-50/50 p-4 rounded-2xl border">
-                          <div className="col-span-5"><input className="w-full bg-white px-4 py-2 rounded-xl border text-sm font-bold" value={rem.label} onChange={e => setAirlineConfigs(p => ({ ...p, [selectedConfigAirline]: { ...p[selectedConfigAirline], reminders: p[selectedConfigAirline].reminders.map(r => r.id === rem.id ? { ...r, label: e.target.value } : r) } }))} /></div>
-                          <div className="col-span-4 flex items-center gap-2">
-                            <input type="number" className="w-16 bg-white px-2 py-2 rounded-xl border text-sm font-bold" value={rem.daysBefore} onChange={e => setAirlineConfigs(p => ({ ...p, [selectedConfigAirline]: { ...p[selectedConfigAirline], reminders: p[selectedConfigAirline].reminders.map(r => r.id === rem.id ? { ...r, daysBefore: parseInt(e.target.value) || 0 } : r) } }))} />
-                            <input type="time" className="w-24 bg-white px-2 py-2 rounded-xl border text-sm font-bold" value={rem.time || '09:00'} onChange={e => setAirlineConfigs(p => ({ ...p, [selectedConfigAirline]: { ...p[selectedConfigAirline], reminders: p[selectedConfigAirline].reminders.map(r => r.id === rem.id ? { ...r, time: e.target.value } : r) } }))} />
-                            <span className="text-[10px] font-black text-gray-400 uppercase">Days / Time</span>
-                          </div>
-                          <div className="col-span-3"><button onClick={() => setAirlineConfigs(p => ({ ...p, [selectedConfigAirline]: { ...p[selectedConfigAirline], reminders: p[selectedConfigAirline].reminders.map(r => r.id === rem.id ? { ...r, active: !r.active } : r) } }))} className={`w-full py-2 rounded-xl font-black text-xs ${rem.active ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-400'}`}>{rem.active ? 'Active' : 'Off'}</button></div>
-                        </div>
-                      ))}
                     </div>
                   </div>
                 </div>
@@ -1318,8 +1360,9 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
-    </div>
+      )
+      }
+    </div >
   );
 };
 

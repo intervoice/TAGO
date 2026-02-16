@@ -20,11 +20,13 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
     airline: '',
     status: '',
     routing: '',
-    agent: ''
+    agent: '',
+    startDate: '',
+    endDate: ''
   });
-  
+
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [pageSize, setPageSize] = useState<number | 'ALL'>(50);
+  const [pageSize, setPageSize] = useState<number | 'ALL'>(10);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Robust permission check
@@ -34,13 +36,15 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
 
   // Apply filters first
   const filtered = useMemo(() => {
-    return groups.filter(g => 
+    return groups.filter(g =>
       g.pnr.toLowerCase().includes(filters.pnr.toLowerCase()) &&
       g.agencyName.toLowerCase().includes(filters.agency.toLowerCase()) &&
       (g.agentName || '').toLowerCase().includes(filters.agent.toLowerCase()) &&
       (filters.airline === '' || g.airline === filters.airline) &&
       (filters.status === '' || g.status === filters.status) &&
-      g.routing.toLowerCase().includes(filters.routing.toLowerCase())
+      g.routing.toLowerCase().includes(filters.routing.toLowerCase()) &&
+      (!filters.startDate || g.depDate >= filters.startDate) &&
+      (!filters.endDate || g.depDate <= filters.endDate)
     );
   }, [groups, filters]);
 
@@ -82,8 +86,8 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Display Mode</span>
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-gray-700">Rows per page:</span>
-              <select 
-                value={pageSize} 
+              <select
+                value={pageSize}
                 onChange={(e) => setPageSize(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
                 className="bg-gray-100 border-none rounded-lg text-xs font-black px-3 py-1.5 focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer"
               >
@@ -106,14 +110,14 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
 
           {pageSize !== 'ALL' && totalPages > 1 && (
             <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200 shadow-inner">
-              <button 
+              <button
                 onClick={() => changePage(currentPage - 1)}
                 disabled={currentPage === 1}
                 className={`p-1.5 rounded-lg transition-all ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-white hover:text-blue-600 hover:shadow-sm'}`}
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              
+
               <div className="flex items-center px-2 gap-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum = currentPage;
@@ -123,7 +127,7 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
                     else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
                     else pageNum = currentPage - 2 + i;
                   }
-                  
+
                   return (
                     <button
                       key={pageNum}
@@ -136,7 +140,7 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
                 })}
               </div>
 
-              <button 
+              <button
                 onClick={() => changePage(currentPage + 1)}
                 disabled={currentPage === totalPages}
                 className={`p-1.5 rounded-lg transition-all ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-white hover:text-blue-600 hover:shadow-sm'}`}
@@ -150,7 +154,7 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse table-fixed min-w-[1700px]">
+          <table className="w-full text-left border-collapse table-fixed min-w-[2000px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-20">Created</th>
@@ -160,8 +164,13 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
                 <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-32">Agent</th>
                 <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-28 text-center bg-blue-50/50">Dep. Date</th>
                 <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-28 text-center">Ret. Date</th>
+                <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-28 text-center">Rec. Agent</th>
+                <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-28 text-center">Sent to AL</th>
                 <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-24">Routing</th>
-                <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-16 text-center">Size</th>
+                <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-24 text-center">Size</th>
+                <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-20 text-center">Deposit</th>
+                <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-20 text-center">Full Pay</th>
+                <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-20 text-center">Names</th>
                 <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-40">Status</th>
                 <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-20 text-right">Fare</th>
                 <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-20 text-right">Tax</th>
@@ -171,36 +180,51 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
                 <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-32">Actions</th>
               </tr>
               <tr className="bg-white border-b border-gray-50">
-                 <td className="p-2"></td>
-                 <td className="p-2">
-                   <select className="w-full text-[10px] p-1 border rounded bg-gray-50 outline-none" value={filters.airline} onChange={(e) => handleFilterChange('airline', e.target.value)}><option value="">All</option>{airlines.map(al => <option key={al} value={al}>{al}</option>)}</select>
-                 </td>
-                 <td className="p-2"><input className="w-full text-[10px] p-1 border rounded bg-gray-50 outline-none" placeholder="PNR" value={filters.pnr} onChange={(e) => handleFilterChange('pnr', e.target.value)} /></td>
-                 <td className="p-2"><input className="w-full text-[10px] p-1 border rounded bg-gray-50 outline-none" placeholder="Agency" value={filters.agency} onChange={(e) => handleFilterChange('agency', e.target.value)} /></td>
-                 <td className="p-2"><input className="w-full text-[10px] p-1 border rounded bg-gray-50 outline-none" placeholder="Agent" value={filters.agent} onChange={(e) => handleFilterChange('agent', e.target.value)} /></td>
-                 <td className="p-2"></td><td className="p-2"></td>
-                 <td className="p-2"><input className="w-full text-[10px] p-1 border rounded bg-gray-50 outline-none" placeholder="Route" value={filters.routing} onChange={(e) => handleFilterChange('routing', e.target.value)} /></td>
-                 <td className="p-2"></td>
-                 <td className="p-2"><select className="w-full text-[10px] p-1 border rounded bg-gray-50 outline-none" value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)}><option value="">All Statuses</option>{STATUS_LIST.map(s => <option key={s} value={s}>{s}</option>)}</select></td>
-                 <td className="p-2"></td><td className="p-2"></td><td className="p-2"></td><td className="p-2"></td><td className="p-2"></td>
-                 <td className="p-2 text-right">
-                   {(filters.pnr || filters.agency || filters.airline || filters.status || filters.routing || filters.agent) && (
-                     <button onClick={() => setFilters({pnr:'', agency:'', airline:'', status:'', routing:'', agent:''})} className="p-1 hover:text-red-500 flex items-center gap-1 text-[10px] font-black uppercase ml-auto"><X className="w-3 h-3" /> Clear</button>
-                   )}
-                 </td>
+                <td className="p-2"></td>
+                <td className="p-2">
+                  <select className="w-full text-[10px] p-1 border rounded bg-gray-50 outline-none" value={filters.airline} onChange={(e) => handleFilterChange('airline', e.target.value)}><option value="">All</option>{airlines.map(al => <option key={al} value={al}>{al}</option>)}</select>
+                </td>
+                <td className="p-2"><input className="w-full text-[10px] p-1 border rounded bg-gray-50 outline-none" placeholder="PNR" value={filters.pnr} onChange={(e) => handleFilterChange('pnr', e.target.value)} /></td>
+                <td className="p-2"><input className="w-full text-[10px] p-1 border rounded bg-gray-50 outline-none" placeholder="Agency" value={filters.agency} onChange={(e) => handleFilterChange('agency', e.target.value)} /></td>
+                <td className="p-2"><input className="w-full text-[10px] p-1 border rounded bg-gray-50 outline-none" placeholder="Agent" value={filters.agent} onChange={(e) => handleFilterChange('agent', e.target.value)} /></td>
+                <td className="p-2">
+                  <div className="flex flex-col gap-1">
+                    <input type="date" className="w-full text-[9px] p-0.5 border rounded bg-gray-50 outline-none" placeholder="From" value={filters.startDate} onChange={(e) => handleFilterChange('startDate', e.target.value)} />
+                    <input type="date" className="w-full text-[9px] p-0.5 border rounded bg-gray-50 outline-none" placeholder="To" value={filters.endDate} onChange={(e) => handleFilterChange('endDate', e.target.value)} />
+                  </div>
+                </td>
+                <td className="p-2"></td>
+                <td className="p-2"></td>
+                <td className="p-2"></td>
+                <td className="p-2"><input className="w-full text-[10px] p-1 border rounded bg-gray-50 outline-none" placeholder="Route" value={filters.routing} onChange={(e) => handleFilterChange('routing', e.target.value)} /></td>
+                <td className="p-2"></td>
+                <td className="p-2"></td>
+                <td className="p-2"></td>
+                <td className="p-2"></td>
+                <td className="p-2"><select className="w-full text-[10px] p-1 border rounded bg-gray-50 outline-none" value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)}><option value="">All Statuses</option>{STATUS_LIST.map(s => <option key={s} value={s}>{s}</option>)}</select></td>
+                <td className="p-2"></td>
+                <td className="p-2"></td>
+                <td className="p-2"></td>
+                <td className="p-2"></td>
+                <td className="p-2"></td>
+                <td className="p-2 text-right">
+                  {(filters.pnr || filters.agency || filters.airline || filters.status || filters.routing || filters.agent || filters.startDate || filters.endDate) && (
+                    <button onClick={() => setFilters({ pnr: '', agency: '', airline: '', status: '', routing: '', agent: '', startDate: '', endDate: '' })} className="p-1 hover:text-red-500 flex items-center gap-1 text-[10px] font-black uppercase ml-auto"><X className="w-3 h-3" /> Clear</button>
+                  )}
+                </td>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 text-sm">
               {paginatedGroups.length === 0 ? (
                 <tr>
-                  <td colSpan={16} className="p-20 text-center">
+                  <td colSpan={21} className="p-20 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <div className="bg-gray-50 p-4 rounded-full">
                         <ListFilter className="w-8 h-8 text-gray-300" />
                       </div>
                       <p className="text-gray-400 font-bold">No matching records found</p>
-                      <button 
-                        onClick={() => setFilters({pnr:'', agency:'', airline:'', status:'', routing:'', agent:''})}
+                      <button
+                        onClick={() => setFilters({ pnr: '', agency: '', airline: '', status: '', routing: '', agent: '', startDate: '', endDate: '' })}
                         className="text-xs text-blue-600 font-black uppercase hover:underline"
                       >
                         Clear all filters
@@ -229,8 +253,25 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
                       <td className="p-3 truncate"><div className="text-[11px] font-medium text-gray-600">{group.agentName}</div></td>
                       <td className="p-3 text-center bg-blue-50/10"><div className="text-xs font-semibold text-gray-900">{formatDate(group.depDate)}</div></td>
                       <td className="p-3 text-center"><div className="text-xs font-semibold text-gray-400">{group.retDate ? formatDate(group.retDate) : '-'}</div></td>
+                      <td className="p-3 text-center"><div className="text-[10px] font-medium text-gray-500">{group.recordByAgent ? formatDate(group.recordByAgent) : '-'}</div></td>
+                      <td className="p-3 text-center"><div className="text-[10px] font-medium text-gray-500">{group.dateSentToAirline ? formatDate(group.dateSentToAirline) : '-'}</div></td>
                       <td className="p-3"><div className="text-[11px] font-medium text-gray-500 truncate">{group.routing}</div></td>
-                      <td className="p-3 text-center"><div className="text-xs font-bold text-gray-600">{group.size}</div></td>
+                      <td className="p-3 text-center">
+                        <div className="text-xs font-bold text-gray-600">
+                          {group.originalSize && group.originalSize !== group.size ? (
+                            <span title="Original / Current" className="flex items-center justify-center gap-1">
+                              <span className="text-gray-400 line-through text-[10px] decoration-red-300 decoration-2">{group.originalSize}</span>
+                              <span className="text-gray-300">/</span>
+                              <span className="text-blue-600 text-sm">{group.size}</span>
+                            </span>
+                          ) : (
+                            group.size
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-3 text-center"><div className="text-[10px] font-medium text-gray-500">{group.depositDate ? formatDate(group.depositDate) : '-'}</div></td>
+                      <td className="p-3 text-center"><div className="text-[10px] font-medium text-gray-500">{group.fullPaymentDate ? formatDate(group.fullPaymentDate) : '-'}</div></td>
+                      <td className="p-3 text-center"><div className="text-[10px] font-medium text-gray-500">{group.namesDate ? formatDate(group.namesDate) : '-'}</div></td>
                       <td className="p-3"><span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${getStatusColor(group.status)}`}>{group.status}</span></td>
                       <td className="p-3 text-right"><div className="font-medium text-gray-700 text-xs">{symbol}{fare.toLocaleString()}</div></td>
                       <td className="p-3 text-right"><div className="font-medium text-gray-500 text-xs">{symbol}{tax.toLocaleString()}</div></td>
@@ -249,9 +290,9 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
                           ) : (
                             <>
                               {canEdit ? (
-                                <button 
-                                  onClick={() => onEdit(group)} 
-                                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl font-black text-[10px] transition-all shadow-sm border border-blue-100" 
+                                <button
+                                  onClick={() => onEdit(group)}
+                                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl font-black text-[10px] transition-all shadow-sm border border-blue-100"
                                   title="Edit Group"
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
@@ -264,9 +305,9 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
                                 </div>
                               )}
                               {canDelete && (
-                                <button 
-                                  onClick={() => setConfirmDeleteId(group.id)} 
-                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100" 
+                                <button
+                                  onClick={() => setConfirmDeleteId(group.id)}
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100"
                                   title="Delete"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
