@@ -304,7 +304,7 @@ const App: React.FC = () => {
           list.push({
             type: 'GROUP_ALERT', dueDate: triggerDate.toISOString(), pnr: group.pnr,
             agency: group.agencyName, description: `${label} Alert`, isOverdue: false,
-            emailTemplate: `Reminder: ${label} for PNR ${group.pnr} is due on ${formatDate(dateStr)}.`
+            emailTemplate: `Reminder: ${label} for PNR ${group.pnr} (Agency: ${group.agencyName}) is due on ${formatDate(dateStr)}.`
           });
         }
       };
@@ -362,9 +362,9 @@ const App: React.FC = () => {
         // Find the specific config reminder definition to get the time
         const configReminder = config?.reminders.find(r => r.label && reminder.description.includes(r.label));
 
-        // Parse scheduled hour (default to 09:00 if missing)
-        const timeParts = (configReminder?.time || '09:00').split(':');
-        const scheduledHour = parseInt(timeParts[0]);
+        // Parse scheduled hour (Enforce 09:00 ISRAEL TIME for all alerts)
+        // const timeParts = (configReminder?.time || '09:00').split(':');
+        const scheduledHour = 9; // Always 09:00
 
         // Unique ID for this specific reminder event instance
         const reminderEventId = `${reminder.pnr}_${reminder.description}_${todayStr}`;
@@ -725,13 +725,21 @@ const App: React.FC = () => {
         addLog(LogAction.UPDATE, editingGroup.id, formData.pnr || editingGroup.pnr, `Updated group information`, changes);
       }
 
-      setGroups(prev => prev.map(g => g.id === editingGroup.id ? { ...g, ...formData } as FlightGroup : g));
+      // Preserve originalSize if size changes
+      let updatedGroupData = { ...formData };
+      if (formData.size !== editingGroup.size) {
+        if (editingGroup.originalSize === undefined || editingGroup.originalSize === null) {
+          updatedGroupData.originalSize = editingGroup.size;
+        }
+      }
+
+      setGroups(prev => prev.map(g => g.id === editingGroup.id ? { ...g, ...updatedGroupData } as FlightGroup : g));
     } else {
       const newGroup: FlightGroup = {
         ...formData,
         id: Math.random().toString(36).substr(2, 9),
         dateCreated: new Date().toISOString(),
-        originalSize: formData.size // Set original size
+        originalSize: formData.size // Set original size on creation
       } as FlightGroup;
       if (newGroup.status === PNRStatus.PD_PROP_SENT) newGroup.dateOfferSent = new Date().toISOString();
 
@@ -821,7 +829,10 @@ const App: React.FC = () => {
         <div className="max-w-[1600px] mx-auto px-4 h-20 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 shrink-0 cursor-pointer" onClick={() => setView('table')}>
             <div className="bg-blue-600 p-2 rounded-xl"><Plane className="w-6 h-6 text-white" /></div>
-            <div className="hidden xl:block"><h1 className="font-black text-2xl text-gray-900 tracking-tighter leading-none">TAGO</h1></div>
+            <div className="hidden xl:block">
+              <h1 className="font-black text-2xl text-gray-900 tracking-tighter leading-none">TAGO</h1>
+              <p className="text-[10px] font-bold text-gray-400 tracking-widest leading-none">by TAL-NET</p>
+            </div>
           </div>
 
           <div className="flex-1 flex items-center gap-2 max-w-3xl">
