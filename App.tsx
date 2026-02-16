@@ -987,40 +987,40 @@ const App: React.FC = () => {
             <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-6">
                 <div className="grid grid-cols-3 gap-4">
-                  <label className="block col-span-1"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Airline</span>
-                    <select className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.airline} onChange={e => updateField('airline', e.target.value)}>
+                  <label className="block col-span-1"><span className="text-[10px] font-black text-gray-400 uppercase block mb-1">Airline</span>
+                    <select className="w-full rounded-xl bg-gray-50 p-2.5 text-xs font-bold outline-none" value={formData.airline} onChange={e => updateField('airline', e.target.value)}>
                       {userVisibleAirlines.map(al => <option key={al} value={al}>{al}</option>)}
                     </select>
                   </label>
-                  <label className="block col-span-1"><span className="text-xs font-black text-gray-400 uppercase block mb-1">PNR</span><input className="w-full rounded-2xl bg-gray-50 p-4 font-black outline-none" value={formData.pnr || ''} onChange={e => updateField('pnr', e.target.value.toUpperCase())} /></label>
-                  <label className="block col-span-1"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Seats (PAX)</span><input type="number" className="w-full rounded-2xl bg-gray-50 p-4 font-black outline-none" value={formData.size || ''} onChange={e => updateField('size', parseInt(e.target.value) || 0)} /></label>
+                  <label className="block col-span-1"><span className="text-[10px] font-black text-gray-400 uppercase block mb-1">PNR</span><input className="w-full rounded-xl bg-gray-50 p-2.5 text-xs font-black outline-none" value={formData.pnr || ''} onChange={e => updateField('pnr', e.target.value.toUpperCase())} /></label>
+                  <label className="block col-span-1"><span className="text-[10px] font-black text-gray-400 uppercase block mb-1">Seats (PAX)</span><input type="number" className="w-full rounded-xl bg-gray-50 p-2.5 text-xs font-black outline-none" value={formData.size || ''} onChange={e => updateField('size', parseInt(e.target.value) || 0)} /></label>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Dep. Date</span><DateInput className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.depDate?.split('T')[0] || ''} onChange={(val) => updateField('depDate', val)} /></label>
-                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Ret. Date</span><DateInput className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.retDate?.split('T')[0] || ''} onChange={(val) => updateField('retDate', val)} /></label>
+                  <label className="block"><span className="text-[10px] font-black text-gray-400 uppercase block mb-1">Dep. Date</span><DateInput className="w-full rounded-xl bg-gray-50 p-2.5 text-xs font-bold outline-none" value={formData.depDate?.split('T')[0] || ''} onChange={(val) => updateField('depDate', val)} /></label>
+                  <label className="block"><span className="text-[10px] font-black text-gray-400 uppercase block mb-1">Ret. Date</span><DateInput className="w-full rounded-xl bg-gray-50 p-2.5 text-xs font-bold outline-none" value={formData.retDate?.split('T')[0] || ''} onChange={(val) => updateField('retDate', val)} /></label>
                 </div>
                 <div className="grid grid-cols-1 gap-4">
-                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Routing (e.g. TLV-ADD-CPT)</span><input className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.routing || ''} onChange={e => updateField('routing', e.target.value)} /></label>
+                  <label className="block"><span className="text-[10px] font-black text-gray-400 uppercase block mb-1">Routing (e.g. TLV-ADD-CPT)</span><input className="w-full rounded-xl bg-gray-50 p-2.5 text-xs font-bold outline-none" value={formData.routing || ''} onChange={e => updateField('routing', e.target.value)} /></label>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <label className="block">
-                    <span className="text-xs font-black text-gray-400 uppercase block mb-1">Agency</span>
-                    <input list="agency-suggestions" className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.agencyName || ''} onChange={e => updateField('agencyName', e.target.value)} />
+                    <span className="text-[10px] font-black text-gray-400 uppercase block mb-1">Agency</span>
+                    <input list="agency-suggestions" className="w-full rounded-xl bg-gray-50 p-2.5 text-xs font-bold outline-none" value={formData.agencyName || ''} onChange={e => updateField('agencyName', e.target.value)} />
                     <datalist id="agency-suggestions">
                       {uniqueAgencies.map(a => <option key={a} value={a} />)}
                     </datalist>
                   </label>
                   <label className="block">
-                    <span className="text-xs font-black text-gray-400 uppercase block mb-1">Agent Name</span>
-                    <input list="agent-suggestions" className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.agentName || ''} onChange={e => updateField('agentName', e.target.value)} />
+                    <span className="text-[10px] font-black text-gray-400 uppercase block mb-1">Agent Name</span>
+                    <input list="agent-suggestions" className="w-full rounded-xl bg-gray-50 p-2.5 text-xs font-bold outline-none" value={formData.agentName || ''} onChange={e => updateField('agentName', e.target.value)} />
                     <datalist id="agent-suggestions">
                       {uniqueAgents.map(a => <option key={a} value={a} />)}
                     </datalist>
                   </label>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Record by Agent</span><DateInput className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.recordByAgent || ''} onChange={(val) => updateField('recordByAgent', val)} /></label>
-                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Date Sent (Airline)</span><DateInput className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.dateSentToAirline || ''} onChange={(val) => updateField('dateSentToAirline', val)} /></label>
+                  <label className="block"><span className="text-[10px] font-black text-gray-400 uppercase block mb-1">Record by Agent</span><DateInput className="w-full rounded-xl bg-gray-50 p-2.5 text-xs font-bold outline-none" value={formData.recordByAgent || ''} onChange={(val) => updateField('recordByAgent', val)} /></label>
+                  <label className="block"><span className="text-[10px] font-black text-gray-400 uppercase block mb-1">Date Sent (Airline)</span><DateInput className="w-full rounded-xl bg-gray-50 p-2.5 text-xs font-bold outline-none" value={formData.dateSentToAirline || ''} onChange={(val) => updateField('dateSentToAirline', val)} /></label>
                 </div>
               </div>
               <div className="space-y-6">
@@ -1065,12 +1065,12 @@ const App: React.FC = () => {
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
-                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Fare ({CURRENCY_SYMBOLS[airlineConfigs[formData.airline || '']?.currency || 'USD']})</span><input type="number" className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.fare || ''} onChange={e => updateField('fare', parseFloat(e.target.value) || 0)} /></label>
-                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Tax</span><input type="number" className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.taxes || ''} onChange={e => updateField('taxes', parseFloat(e.target.value) || 0)} /></label>
-                  <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Markup</span><input type="number" className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.markup || ''} onChange={e => updateField('markup', parseFloat(e.target.value) || 0)} /></label>
+                  <label className="block"><span className="text-[10px] font-black text-gray-400 uppercase block mb-1">Fare ({CURRENCY_SYMBOLS[airlineConfigs[formData.airline || '']?.currency || 'USD']})</span><input type="number" className="w-full rounded-xl bg-gray-50 p-2.5 text-xs font-bold outline-none" value={formData.fare || ''} onChange={e => updateField('fare', parseFloat(e.target.value) || 0)} /></label>
+                  <label className="block"><span className="text-[10px] font-black text-gray-400 uppercase block mb-1">Tax</span><input type="number" className="w-full rounded-xl bg-gray-50 p-2.5 text-xs font-bold outline-none" value={formData.taxes || ''} onChange={e => updateField('taxes', parseFloat(e.target.value) || 0)} /></label>
+                  <label className="block"><span className="text-[10px] font-black text-gray-400 uppercase block mb-1">Markup</span><input type="number" className="w-full rounded-xl bg-gray-50 p-2.5 text-xs font-bold outline-none" value={formData.markup || ''} onChange={e => updateField('markup', parseFloat(e.target.value) || 0)} /></label>
                 </div>
-                <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Status</span><select className="w-full rounded-2xl bg-gray-50 p-4 font-bold outline-none" value={formData.status || PNRStatus.PD_PNR_CREATED} onChange={e => updateField('status', e.target.value as PNRStatus)}>{STATUS_LIST.map(s => <option key={s} value={s}>{s}</option>)}</select></label>
-                <label className="block"><span className="text-xs font-black text-gray-400 uppercase block mb-1">Remarks</span><textarea className="w-full rounded-2xl bg-gray-50 p-4 font-medium h-24 resize-none outline-none" value={formData.remarks || ''} onChange={e => updateField('remarks', e.target.value)} /></label>
+                <label className="block"><span className="text-[10px] font-black text-gray-400 uppercase block mb-1">Status</span><select className="w-full rounded-xl bg-gray-50 p-2.5 text-xs font-bold outline-none" value={formData.status || PNRStatus.PD_PNR_CREATED} onChange={e => updateField('status', e.target.value as PNRStatus)}>{STATUS_LIST.map(s => <option key={s} value={s}>{s}</option>)}</select></label>
+                <label className="block"><span className="text-[10px] font-black text-gray-400 uppercase block mb-1">Remarks</span><textarea className="w-full rounded-xl bg-gray-50 p-2.5 text-xs font-medium h-24 resize-none outline-none" value={formData.remarks || ''} onChange={e => updateField('remarks', e.target.value)} /></label>
               </div>
             </div>
             <div className="p-10 bg-gray-50 border-t flex justify-end gap-4"><button onClick={() => setIsFormOpen(false)} className="px-8 py-4 rounded-2xl font-black text-gray-500">Cancel</button><button onClick={handleSave} className="px-10 py-4 rounded-2xl bg-blue-600 text-white font-black shadow-xl">Save Record</button></div>
@@ -1095,10 +1095,10 @@ const App: React.FC = () => {
                   {users.map(u => (
                     <div key={u.id} className="flex flex-col gap-4">
                       <div className="bg-gray-50 p-6 rounded-3xl border flex items-center justify-between">
-                        <div><p className="font-black text-lg">{u.username}</p><p className="text-[10px] font-bold text-gray-400 uppercase">{u.role}</p></div>
+                        <div><p className="font-black text-sm">{u.username}</p><p className="text-[9px] font-bold text-gray-400 uppercase">{u.role}</p></div>
                         <div className="flex gap-2">
-                          <button onClick={() => setEditingUserPermissions(editingUserPermissions === u.id ? null : u.id)} className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl font-black text-xs">Manage Access</button>
-                          {u.username !== 'admin' && <button onClick={() => setUsers(prev => prev.filter(usr => usr.id !== u.id))} className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"><Trash2 className="w-5 h-5" /></button>}
+                          <button onClick={() => setEditingUserPermissions(editingUserPermissions === u.id ? null : u.id)} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl font-black text-[10px]">Manage Access</button>
+                          {u.username !== 'admin' && <button onClick={() => setUsers(prev => prev.filter(usr => usr.id !== u.id))} className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"><Trash2 className="w-4 h-4" /></button>}
                         </div>
                       </div>
                       {editingUserPermissions === u.id && (

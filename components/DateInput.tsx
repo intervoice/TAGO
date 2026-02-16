@@ -54,7 +54,7 @@ export const DateInput: React.FC<DateInputProps> = ({ value, onChange, className
             <input
                 type="text"
                 className="w-full h-full bg-transparent p-4 outline-none"
-                placeholder={placeholder || "DD/MM/YYYY"}
+                placeholder={placeholder || "dd/mm/yyyy"}
                 value={displayValue}
                 onChange={handleDisplayChange}
                 maxLength={10}
