@@ -24,7 +24,8 @@ export enum PNRStatus {
   OK_ISSUED = 'OK Issued',
   DEPO_REFUND_RQST = 'Depo Refund Rqst',
   DEPO_REFUND_APPV = 'Depo Refund Appv',
-  REFUND_INVOL = 'Refund SC/INVOL'
+  REFUND_INVOL = 'Refund SC/INVOL',
+  GRP_FEE_PAID = 'Grp fee paid'
 }
 
 export type AirlineCode = string;
@@ -84,7 +85,7 @@ export interface FlightGroup {
   // New tracking fields
   recordByAgent?: string;
   dateSentToAirline?: string;
-  
+
   // Specific alerts
   depositDate?: string;
   depositDaysBefore?: number;
@@ -92,6 +93,8 @@ export interface FlightGroup {
   fullPaymentDaysBefore?: number;
   namesDate?: string;
   namesDaysBefore?: number;
+  grpFeeDate?: string;
+  grpFeeDaysBefore?: number;
 
   remarks: string;
   openingFeeReceipt: string;

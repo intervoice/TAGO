@@ -170,6 +170,7 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
                 <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-24">Routing</th>
                 <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-24 text-center">Size</th>
                 <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-20 text-center">Deposit</th>
+                <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-20 text-center">Grp Fee</th>
                 <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-20 text-center">Full Pay</th>
                 <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-20 text-center">Names</th>
                 <th className="p-3 text-[11px] font-bold text-gray-500 uppercase w-40">Status</th>
@@ -198,6 +199,7 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
                 <td className="p-2"></td>
                 <td className="p-2"></td>
                 <td className="p-2"><input className="w-full text-[10px] p-1 border rounded bg-gray-50 outline-none" placeholder="Route" value={filters.routing} onChange={(e) => handleFilterChange('routing', e.target.value)} /></td>
+                <td className="p-2"></td>
                 <td className="p-2"></td>
                 <td className="p-2"></td>
                 <td className="p-2"></td>
@@ -271,6 +273,7 @@ export const GroupTable: React.FC<GroupTableProps> = ({ groups, airlineConfigs, 
                         </div>
                       </td>
                       <td className="p-3 text-center"><div className="text-[10px] font-medium text-gray-500">{group.depositDate ? formatDate(group.depositDate) : '-'}</div></td>
+                      <td className="p-3 text-center"><div className="text-[10px] font-medium text-gray-500">{group.grpFeeDate ? formatDate(group.grpFeeDate) : '-'}</div></td>
                       <td className="p-3 text-center"><div className="text-[10px] font-medium text-gray-500">{group.fullPaymentDate ? formatDate(group.fullPaymentDate) : '-'}</div></td>
                       <td className="p-3 text-center"><div className="text-[10px] font-medium text-gray-500">{group.namesDate ? formatDate(group.namesDate) : '-'}</div></td>
                       <td className="p-3"><span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${getStatusColor(group.status)}`}>{group.status}</span></td>

@@ -14,5 +14,53 @@
       "HM",
       "PG"
     ]
+  },
+  {
+    "id": "lrtcap0z2",
+    "username": "trwer",
+    "password": "erw",
+    "role": "VIEWER",
+    "fullName": "trwer",
+    "allowedAirlines": []
+  },
+  {
+    "id": "2fak5b6tw",
+    "username": "rwer",
+    "password": "wer",
+    "role": "VIEWER",
+    "fullName": "rwer",
+    "allowedAirlines": []
+  },
+  {
+    "id": "icdo5lha8",
+    "username": "wrer",
+    "password": "erw",
+    "role": "VIEWER",
+    "fullName": "wrer",
+    "allowedAirlines": []
+  },
+  {
+    "id": "pezjhs8i4",
+    "username": "rwer",
+    "password": "erwt",
+    "role": "VIEWER",
+    "fullName": "rwer",
+    "allowedAirlines": []
+  },
+  {
+    "id": "hoe9cq1kw",
+    "username": "terv",
+    "password": "gdfv",
+    "role": "VIEWER",
+    "fullName": "terv",
+    "allowedAirlines": []
+  },
+  {
+    "id": "mlutkr4wn",
+    "username": "fdsfvd",
+    "password": "rferd",
+    "role": "VIEWER",
+    "fullName": "fdsfvd",
+    "allowedAirlines": []
   }
 ]

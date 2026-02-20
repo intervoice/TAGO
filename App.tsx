@@ -296,23 +296,24 @@ const App: React.FC = () => {
       }
 
       // 2. Per-Group Alerts
-      const checkAlert = (label: string, dateStr?: string, daysBefore?: number) => {
+      const checkAlert = (label: string, dateStr?: string, daysBefore?: number, typeId?: string) => {
         if (!dateStr || daysBefore === undefined || daysBefore === null) return;
         const targetDate = new Date(dateStr);
         const triggerDate = subtractDays(targetDate, daysBefore);
         // Compare dates only
         if (triggerDate.toISOString().split('T')[0] === todayStr) {
           list.push({
-            type: 'GROUP_ALERT', dueDate: triggerDate.toISOString(), pnr: group.pnr,
+            type: typeId || 'GROUP_ALERT', dueDate: triggerDate.toISOString(), pnr: group.pnr,
             agency: group.agencyName, description: `${label} Alert`, isOverdue: false,
             emailTemplate: `Reminder: ${label} for PNR ${group.pnr} (Agency: ${group.agencyName}) is due on ${formatDate(dateStr)}.`
           });
         }
       };
 
-      checkAlert('Deposit', group.depositDate, group.depositDaysBefore);
-      checkAlert('Full Payment', group.fullPaymentDate, group.fullPaymentDaysBefore);
-      checkAlert('Names', group.namesDate, group.namesDaysBefore);
+      checkAlert('Deposit', group.depositDate, group.depositDaysBefore, 'DEPOSIT_ALERT');
+      checkAlert('Grp Fee', group.grpFeeDate, group.grpFeeDaysBefore, 'GRP_FEE_ALERT');
+      checkAlert('Full Payment', group.fullPaymentDate, group.fullPaymentDaysBefore, 'FULL_PAYMENT_ALERT');
+      checkAlert('Names', group.namesDate, group.namesDaysBefore, 'NAMES_ALERT');
     });
     return list;
   }, [groups, userVisibleAirlines]);
@@ -428,13 +429,23 @@ const App: React.FC = () => {
 
   // --- Export Logic ---
   const handleExportCSV = () => {
-    const exportGroups = groups.filter(g => exportSelectedAirlines.includes(g.airline));
+    // Determine the base set of groups to export.
+    // We start with all groups matching the airline checkbox selection in the modal.
+    let exportGroups = groups.filter(g => exportSelectedAirlines.includes(g.airline));
+
+    // Then, we explicitly enforce the global Status dropdown filter.
+    if (selectedStatus !== 'ALL') {
+      exportGroups = exportGroups.filter(g => g.status === selectedStatus);
+    }
     if (exportGroups.length === 0) return;
 
     const headers = [
       'Date Created', 'Airline', 'PNR', 'Agency Name', 'Agent Name',
       'Dep. Date', 'Ret. Date', 'Routing', 'PAX Size', 'Status',
-      'Fare', 'Taxes', 'Markup', 'Total Per Pax', 'Remarks'
+      'Fare', 'Taxes', 'Markup', 'Total Per Pax', 'Remarks',
+      'Original Size', 'Date Sent To Airline', 'Record By Agent', 'Date Offer Sent',
+      'Deposit Date', 'Deposit Days Before', 'Grp Fee Date', 'Grp Fee Days Before', 'Full Payment Date', 'Full Payment Days Before',
+      'Names Date', 'Names Days Before'
     ];
 
     const rows = exportGroups.map(g => {
@@ -444,20 +455,32 @@ const App: React.FC = () => {
 
       return [
         new Date(g.dateCreated).toLocaleDateString('en-GB'),
-        g.airline,
-        g.pnr,
-        `"${g.agencyName.replace(/"/g, '""')}"`,
+        g.airline || '',
+        g.pnr || '',
+        `"${(g.agencyName || '').replace(/"/g, '""')}"`,
         `"${(g.agentName || '').replace(/"/g, '""')}"`,
-        new Date(g.depDate).toLocaleDateString('en-GB'),
+        g.depDate ? new Date(g.depDate).toLocaleDateString('en-GB') : '-',
         g.retDate ? new Date(g.retDate).toLocaleDateString('en-GB') : '-',
-        `"${g.routing.replace(/"/g, '""')}"`,
-        g.size,
-        g.status,
-        `${currencySymbol}${g.fare}`,
-        `${currencySymbol}${g.taxes}`,
-        `${currencySymbol}${g.markup}`,
-        `${currencySymbol}${total}`,
-        `"${(g.remarks || '').replace(/"/g, '""')}"`
+        `"${(g.routing || '').replace(/"/g, '""')}"`,
+        g.size || 0,
+        g.status || '',
+        g.fare || 0,
+        g.taxes || 0,
+        g.markup || 0,
+        total,
+        `"${(g.remarks || '').replace(/"/g, '""')}"`,
+        g.originalSize || '',
+        g.dateSentToAirline ? new Date(g.dateSentToAirline).toLocaleDateString('en-GB') : '-',
+        g.recordByAgent ? new Date(g.recordByAgent).toLocaleDateString('en-GB') : '-',
+        g.dateOfferSent ? new Date(g.dateOfferSent).toLocaleDateString('en-GB') : '-',
+        g.depositDate ? new Date(g.depositDate).toLocaleDateString('en-GB') : '-',
+        g.depositDaysBefore || '',
+        g.grpFeeDate ? new Date(g.grpFeeDate).toLocaleDateString('en-GB') : '-',
+        g.grpFeeDaysBefore || '',
+        g.fullPaymentDate ? new Date(g.fullPaymentDate).toLocaleDateString('en-GB') : '-',
+        g.fullPaymentDaysBefore || '',
+        g.namesDate ? new Date(g.namesDate).toLocaleDateString('en-GB') : '-',
+        g.namesDaysBefore || ''
       ];
     });
 
@@ -563,7 +586,18 @@ const App: React.FC = () => {
             taxes: parseCurrency(row['Taxes']),
             markup: parseCurrency(row['Markup']),
             remarks: row['Remarks'] || '',
-            // Default empty for fields not in export
+            originalSize: parseInt(row['Original Size']) || undefined,
+            dateSentToAirline: parseDate(row['Date Sent To Airline']),
+            recordByAgent: parseDate(row['Record By Agent']),
+            dateOfferSent: parseDate(row['Date Offer Sent']),
+            depositDate: parseDate(row['Deposit Date']),
+            depositDaysBefore: parseInt(row['Deposit Days Before']) || 0,
+            grpFeeDate: parseDate(row['Grp Fee Date']),
+            grpFeeDaysBefore: parseInt(row['Grp Fee Days Before']) || 0,
+            fullPaymentDate: parseDate(row['Full Payment Date']),
+            fullPaymentDaysBefore: parseInt(row['Full Payment Days Before']) || 0,
+            namesDate: parseDate(row['Names Date']),
+            namesDaysBefore: parseInt(row['Names Days Before']) || 0,
             openingFeeReceipt: '',
             depoNumber: '',
             fPaymentEmd: '',
@@ -623,6 +657,7 @@ const App: React.FC = () => {
     airline: userVisibleAirlines[0] || 'ET', pnr: '', agencyName: '', agentName: '',
     depDate: new Date().toISOString().split('T')[0], retDate: '', routing: '', size: 20, status: PNRStatus.PD_PNR_CREATED,
     remarks: '', fare: 0, taxes: 0, markup: 0,
+    depositDaysBefore: 0, fullPaymentDaysBefore: 0, namesDaysBefore: 0, grpFeeDaysBefore: 0
   };
   const [formData, setFormData] = useState<Partial<FlightGroup>>(initialFormState);
 
@@ -1063,6 +1098,17 @@ const App: React.FC = () => {
                       <input type="number" placeholder="Days" className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.namesDaysBefore} onChange={e => updateField('namesDaysBefore', parseInt(e.target.value) || 0)} />
                     </div>
                   </div>
+
+                  {/* Group Fee */}
+                  <div className="grid grid-cols-12 gap-2 items-end">
+                    <div className="col-span-3 text-[10px] font-bold text-gray-500 uppercase">Grp Fee</div>
+                    <div className="col-span-5">
+                      <DateInput className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.grpFeeDate || ''} onChange={(val) => updateField('grpFeeDate', val)} />
+                    </div>
+                    <div className="col-span-4">
+                      <input type="number" placeholder="Days" className="w-full bg-white rounded-xl px-2 py-1.5 text-xs font-bold border-none" value={formData.grpFeeDaysBefore} onChange={e => updateField('grpFeeDaysBefore', parseInt(e.target.value) || 0)} />
+                    </div>
+                  </div>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   <label className="block"><span className="text-[10px] font-black text-gray-400 uppercase block mb-1">Fare ({CURRENCY_SYMBOLS[airlineConfigs[formData.airline || '']?.currency || 'USD']})</span><input type="number" className="w-full rounded-xl bg-gray-50 p-2.5 text-xs font-bold outline-none" value={formData.fare || ''} onChange={e => updateField('fare', parseFloat(e.target.value) || 0)} /></label>
@@ -1081,15 +1127,15 @@ const App: React.FC = () => {
       {isUserMgmtOpen && (
         <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
-            <div className="p-8 border-b flex justify-between items-center bg-white"><div className="flex items-center gap-3"><ShieldCheck className="w-7 h-7 text-blue-600" /><h3 className="text-2xl font-black">Configuration</h3></div><button onClick={() => setIsUserMgmtOpen(false)} className="text-gray-400 bg-gray-100 p-2 rounded-full"><X className="w-6 h-6" /></button></div>
-            <div className="flex border-b bg-gray-50/50 overflow-x-auto">
+            <div className="p-8 border-b flex justify-between items-center bg-white shrink-0"><div className="flex items-center gap-3"><ShieldCheck className="w-7 h-7 text-blue-600" /><h3 className="text-2xl font-black">Configuration</h3></div><button onClick={() => setIsUserMgmtOpen(false)} className="text-gray-400 bg-gray-100 p-2 rounded-full"><X className="w-6 h-6" /></button></div>
+            <div className="flex border-b bg-gray-50/50 overflow-x-auto shrink-0">
               <button onClick={() => setAdminTab('users')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 whitespace-nowrap ${adminTab === 'users' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-400'}`}>Users</button>
               <button onClick={() => setAdminTab('airlines')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 whitespace-nowrap ${adminTab === 'airlines' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-400'}`}>Airlines & Currency</button>
               <button onClick={() => setAdminTab('email')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 whitespace-nowrap ${adminTab === 'email' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-400'}`}>Email Integration</button>
               <button onClick={() => setAdminTab('logs')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 whitespace-nowrap ${adminTab === 'logs' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-400'}`}>System Logs</button>
               <button onClick={() => setAdminTab('backup')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 whitespace-nowrap ${adminTab === 'backup' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-400'}`}>Backup & Restore</button>
             </div>
-            <div className="p-8 flex-1 overflow-y-auto">
+            <div className="p-8 flex-1 overflow-y-auto min-h-0">
               {adminTab === 'users' ? (
                 <div className="space-y-6">
                   {users.map(u => (
